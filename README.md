@@ -72,12 +72,6 @@ All analyses are contained in a single script: `asthma_gv_JAH_040226.R`
 | [27] | Descriptive statistics table (overall and stratified by sex) |
 | [28] | Figures 1–4 (forest plots, predicted probability curves; saved as PNG) |
 
-### Exploratory (Section 29)
-
-| Section | Description |
-|---------|-------------|
-| [29] | Policy analysis (exploratory; not reported in manuscript; retained for reference) |
-
 ---
 
 ## Primary Exposure
