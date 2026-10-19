@@ -1,6 +1,6 @@
 # =============================================================================
 # ADOLESCENT EXPOSURE TO DEADLY GUN VIOLENCE & ASTHMA BURDEN IN EARLY ADULTHOOD
-# Martz, Navas Nazario & Gaydosh | Journal of Adolescent Health Submission
+# Martz, Navas Nazario & Gaydosh | Journal of Urban Health
 # =============================================================================
 #
 # SCRIPT STRUCTURE:
@@ -21,27 +21,30 @@
 #     [13] Standardize Key Continuous Predictors (full df)
 #
 #   ANALYSIS (Sections 14–26)
-#     [14] Helper Functions (robust CI extraction)
-#     [15] Create df_reduced
-#     [16] Analytic Sample Preparation (df_main_nomiss; n=1,936)
+#     [14]   Helper Functions
+#     [15]   Create df_reduced
+#     [16]   Analytic Sample Preparation (df_main_nomiss)
 #     [16.1] Attrition Analysis
-#     [17] Check Clustering (ICC)
-#     [18] Main Models: Incident Asthma (n=1,936)
-#     [19] Secondary Analytic Datasets
-#     [20] Hospitalization Models
-#     [21] Severity Models
-#     [22] Supplemental: Spatial Sensitivity
-#     [23] Supplemental: Null Findings at Age 15
-#     [24] Supplemental: Built Environment Sensitivity
-#     [25] Supplemental: Additional Sensitivity Checks
-#     [26] Supplemental: Propensity Score Matched Analysis
+#     [16.2] Sample Flowchart Counts (Figure S1)
+#     [17]   Check Clustering (ICC)
+#     [18]   Main Models: Incident Asthma (Table S1)
+#     [19]   Secondary Analytic Datasets
+#     [20]   Hospitalization Models: Firth Logistic Regression (Tables S2, S4)
+#     [21]   Functional Limitation Models (Tables S3, S5)
+#     [22]   Supplemental: Spatial Sensitivity (Figure S2)
+#     [23]   Supplemental: Falsification Tests at Age 15
+#     [24]   Supplemental: Built Environment Sensitivity
+#     [25]   Supplemental: Additional Confounders
+#     [26]   Supplemental: Propensity Score Analyses (Figures S3–S4)
 #
 #   OUTPUTS (Sections 27–28)
-#     [27] Descriptive Statistics Table
-#     [28] Figures
+#     [27] Descriptive Statistics (Table 1)
+#     [28] Figures 1–3
 #
-#   EXPLORATORY (Section 29 — not reported in manuscript)
-#     [29] Policy Analysis (exploratory; retained for reference)
+#   ADDITIONAL SENSITIVITY ANALYSES (Sections 29–31; Table S6)
+#     [29] Exposure Data Quality
+#     [30] Exposure Distribution
+#     [31] Neighborhood Traffic Density
 #
 # =============================================================================
 
@@ -50,63 +53,43 @@
 # [1] LOAD LIBRARIES ----
 # =============================================================================
 
-library(lubridate)
-library(lmtest)
-library(sandwich)
-library(sjPlot)
+library(lubridate) 
+library(haven)     
 library(dplyr)
-library(corrplot)
-library(visdat)
-library(purrr)
-library(broom)
-library(forcats)
-library(stringr)
-library(scales)
-library(cowplot)
-library(marginaleffects)
-library(ggplot2)
-library(patchwork)
-library(ggeffects)
-library(haven)
-library(lme4)
-library(performance)
 library(tidyr)
-library(DT)
-library(MatchIt)
-library(cobalt)
-library(WeightIt)
 library(tibble)
+library(lmtest)    
+library(sandwich)   
+library(lme4)        
+library(performance) 
+library(logistf)    
+library(MatchIt)   
+library(cobalt)     
+library(ggplot2)
+library(ggeffects)  
+library(scales)
+library(patchwork)
 library(flextable)
-library(tibble)
-
 
 # =============================================================================
 # [2] DATA IMPORT ----
 # =============================================================================
 
-y22     <- read_dta(
-  "/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/2. MANUSCRIPTS/MARTZ GUN VIOLENCE ASTHMA/data/FF_wave7_2024v2.dta"
-)
-core    <- read_dta(
-  "/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/2. MANUSCRIPTS/MARTZ GUN VIOLENCE ASTHMA/data/FF_allwaves_2020v2.dta"
-)
-census00 <- read_csv("/Users/co453621/Desktop/census.csv")
-geoid   <- read_csv("/Users/co453621/Desktop/geoid.csv")
-FF_gva  <- read_csv("/Users/co453621/Desktop/gva.csv")
-FF_ucr  <- read_csv("/Users/co453621/Desktop/ucr.csv")
-
+core    <- read_dta("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/15. DATA/FFCWS ALL WAVES Y0-Y22/Raw Data/ffcws_core_y0_y22.dta")
+census00 <- read_csv("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/15. DATA/FFCWS ALL WAVES Y0-Y22/Restricted Data/FFCWS Restricted Use Data_GRP - Documents/Restricted Data/ffgeo7_all_pub.dta")
+geoid   <- read_csv("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/15. DATA/FFCWS ALL WAVES Y0-Y22/Restricted Data/FFCWS Restricted Use Data_GRP - Documents/Restricted Data/contractcity7pub_121824.dta")
+FF_gva  <- read_csv("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/15. DATA/FFCWS ALL WAVES Y0-Y22/Restricted Data/FFCWS Restricted Use Data_GRP - Documents/Restricted Data/ff_gva_15y_pub1_20190426.dta")
+FF_ucr  <- read_csv("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/15. DATA/FFCWS ALL WAVES Y0-Y22/Restricted Data/FFCWS Restricted Use Data_GRP - Documents/Restricted Data/ff_UCR_pub1.dta")
 
 # =============================================================================
 # [3] MERGE DATA ----
 # =============================================================================
 
 df <- core %>%
-  inner_join(y22, by = "idnum") %>%
   left_join(geoid, by = "idnum") %>%
   left_join(census00, by = "idnum") %>%
   left_join(FF_gva, by = "idnum") %>%
   left_join(FF_ucr, by = "idnum")
-
 
 # =============================================================================
 # [4] DATE & EXPOSURE WINDOW VARIABLES ----
@@ -463,6 +446,9 @@ df <- df %>%
     
     # --- 10.6 Tract ID (Wave 6 / Year 15) ---
     trct_id6 = case_when(tp6tract_cen00 >= 0 ~ tp6tract_cen00, TRUE ~ NA)
+
+    # --- 10.7 Youth-reported neighborhood traffic, age 15 (higher = more traffic) ---
+    traffic_t6 = ifelse(k6e4a < 0, NA, 5 - k6e4a)
   )
 
 
@@ -523,20 +509,20 @@ df <- df %>%
       p5h1b %in% c(1, -2, -9)                                       ~ NA_real_,
       p6b2  %in% c(-9, -2)                                          ~ NA_real_,
       p5h1b == 2 & p6b2 == 2                                        ~ 0,
-      p5h1b == 2 & p6b2 %in% c(-9,-3,-2,-1) & p6b27_3 == 0         ~ 0,
+      p5h1b == 2 & p6b2 %in% c(-9,-3,-2,-1) & p6b27_3 == 0          ~ 0,
       p5h1b == 2 & p6b2 == 1                                        ~ 1,
-      p5h1b == 2 & p6b2 %in% c(-9,-3,-2,-1) & p6b27_3 == 1         ~ 1,
+      p5h1b == 2 & p6b2 %in% c(-9,-3,-2,-1) & p6b27_3 == 1          ~ 1,
       TRUE ~ NA_real_
     ),
     
     # --- 12.2 Incident asthma diagnosis (Y15 to Y22) | PRIMARY OUTCOME ---
     newasthmadx_22 = case_when(
       p6b2  %in% c(1, -2, -9)                                       ~ NA_real_,
-      k7i4_1 %in% c(-9,-3,-2,-1) & p7i3_1 %in% c(-9,-6,-3,-1)      ~ NA_real_,
+      k7i4_1 %in% c(-9,-3,-2,-1) & p7i3_1 %in% c(-9,-6,-3,-1)       ~ NA_real_,
       p6b2 == 2 & k7i4_1 == 0                                       ~ 0,
-      p6b2 == 2 & k7i4_1 %in% c(-9,-3,-2,-1) & p7i3_1 == 0         ~ 0,
+      p6b2 == 2 & k7i4_1 %in% c(-9,-3,-2,-1) & p7i3_1 == 0          ~ 0,
       p6b2 == 2 & k7i4_1 == 1                                       ~ 1,
-      p6b2 == 2 & k7i4_1 %in% c(-9,-3,-2,-1) & p7i3_1 == 1         ~ 1,
+      p6b2 == 2 & k7i4_1 %in% c(-9,-3,-2,-1) & p7i3_1 == 1          ~ 1,
       TRUE ~ NA_real_
     ),
     
@@ -641,6 +627,90 @@ robust_ci_lincomb <- function(fit, coefs, transform = exp, type = "HC1") {
   tibble(estimate = transform(est), l95 = transform(ci[1]), u95 = transform(ci[2]))
 }
 
+# Female-specific OR (HC1) from an exposure x female model
+female_or <- function(m, exp_var) {
+  int <- paste0(exp_var, ":female")
+  V   <- vcovHC(m, type = "HC1")
+  b   <- coef(m)[exp_var] + coef(m)[int]
+  se  <- sqrt(V[exp_var, exp_var] + V[int, int] + 2 * V[exp_var, int])
+  round(exp(c(OR = b, lower = b - 1.96 * se, upper = b + 1.96 * se)), 2)
+}
+ 
+# All coefficients with HC1 robust 95% CIs (exp = OR; identity = beta)
+extract_robust <- function(mod, label, transform = exp) {
+  ct <- coeftest(mod, vcov. = vcovHC, type = "HC1")
+  ci <- coefci(mod,   vcov. = vcovHC, type = "HC1")
+  tibble(term  = rownames(ct),
+         est   = transform(ct[, 1]),
+         lower = transform(ci[, 1]),
+         upper = transform(ci[, 2]),
+         pval  = ct[, 4],
+         model = label)
+}
+ 
+# All coefficients from a Firth model (profile penalized-likelihood CIs)
+extract_firth <- function(mod, label) {
+  tibble(term  = names(coef(mod)),
+         est   = exp(coef(mod)),
+         lower = exp(mod$ci.lower),
+         upper = exp(mod$ci.upper),
+         pval  = mod$prob,
+         model = label)
+}
+
+# Row labels for supplemental Tables S1-S5
+term_labels <- c(
+  "gvh1600rate_std"                = "Gun Violence Exposure (1,600m), std.",
+  "gvh1600rate_std:female"         = "Gun Violence x Female (interaction)",
+  "female"                         = "Female (ref: Male)",
+  "age_t7"                         = "Age at Age 22 Assessment, std.",
+  "smoking_t6"                     = "Smoking, Past Month (Age 15)",
+  "smoking_t7"                     = "Smoking, Past Month (Age 22)",
+  "vaping_t7"                      = "Vaping, Past Year (Age 22)",
+  "pov_t6_std"                     = "Income-Poverty Ratio (Age 15), std.",
+  "pov_t7_std"                     = "Income-Poverty Ratio (Age 22), std.",
+  "edu_t62"                        = "Parent Education (Age 15): HS or Equivalent",
+  "edu_t63"                        = "Parent Education (Age 15): Some College",
+  "edu_t64"                        = "Parent Education (Age 15): College/Graduate Degree",
+  "edu_t72"                        = "Own Education (Age 22): HS or Equivalent",
+  "edu_t73"                        = "Own Education (Age 22): Some College",
+  "edu_t74"                        = "Own Education (Age 22): College/Graduate Degree",
+  "edu_t7_binSome College or More" = "Own Education (Age 22): Some College or More (ref: <= HS)",
+  "raceWhite"                      = "Race/Ethnicity: Non-Hispanic White (ref: Non-Hispanic Black)",
+  "raceHispanic"                   = "Race/Ethnicity: Hispanic",
+  "raceOther"                      = "Race/Ethnicity: Multiracial/Other",
+  "trct_pct_pov_t6_std"            = "Census Tract % Poverty (Age 15), std.",
+  "vc_rate15_std"                  = "County Violent Crime Rate (Age 15), std.",
+  "household_smokers_t6"           = "Household Smokers (Age 15)",
+  "household_size_t6"              = "Household Size (Age 15), std."
+)
+
+# Wide table: terms as rows, Models 1-6 as columns, "est (LL-UL)" cells
+make_wide_table <- function(results) {
+  results %>%
+    filter(term != "(Intercept)") %>%
+    mutate(cell = sprintf("%.2f (%.2f-%.2f)", est, lower, upper)) %>%
+    dplyr::select(term, model, cell) %>%
+    tidyr::pivot_wider(names_from = model, values_from = cell, values_fill = "-") %>%
+    mutate(order = match(term, names(term_labels)),
+           label = ifelse(term %in% names(term_labels), term_labels[term], term)) %>%
+    arrange(order) %>%
+    dplyr::select(label, M1, M2, M3, M4, M5, M6)
+}
+ 
+# Format a wide table as a flextable and save it to out_dir as .docx
+save_table <- function(wide, file) {
+  ft <- flextable(wide) %>%
+    set_header_labels(label = "Covariate",
+                      M1 = "Model 1", M2 = "Model 2", M3 = "Model 3", M4 = "Model 4",
+                      M5 = "Model 5 (Primary)", M6 = "Model 6 (Sex Interaction)") %>%
+    fontsize(size = 8, part = "all") %>%
+    font(fontname = "Times New Roman", part = "all") %>%
+    align(j = 2:7, align = "center", part = "all") %>%
+    set_table_properties(layout = "autofit")
+  save_as_docx(ft, path = file.path(out_dir, file))
+  ft
+}
 
 # =============================================================================
 # [15] CREATE df_reduced ----
@@ -729,10 +799,14 @@ df_main_nomiss <- df_reduced_main %>%
     pov_t6_std          = as.numeric(scale(pov_t6)),
     trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6)),
     gvh1600count_top    = ifelse(gvh1600count > 15, 15, gvh1600count)
-  )
+  ) %>%
+  # Variables for sensitivity analyses and ICCs, added after listwise
+  # deletion so they do not change the analytic sample
+  left_join(dplyr::select(df_reduced, idnum, pcg_asthma, state_t6, trct_id6), by = "idnum") %>%
+  left_join(dplyr::select(df, idnum, atleast_1year_exposure, traffic_t6),     by = "idnum")
 
-cat("Primary analytic sample n =", nrow(df_main_nomiss), "\n")                         # n=1,936
-cat("Incident asthma cases n =", sum(df_main_nomiss$newasthmadx_22, na.rm = TRUE), "\n") # n=109
+cat("Primary analytic sample n =", nrow(df_main_nomiss), "\n")                         
+cat("Incident asthma cases n =", sum(df_main_nomiss$newasthmadx_22, na.rm = TRUE), "\n") 
 
 # --- [16.1] Attrition Analysis ----
 # Tests whether loss to follow-up at Y22 is associated with exposure
@@ -741,47 +815,63 @@ cat("Incident asthma cases n =", sum(df_main_nomiss$newasthmadx_22, na.rm = TRUE
 
 df_eligible <- df_reduced %>%
   filter(anyasthmadx_15 == 0) %>%
-  mutate(
-    attrited    = ifelse(is.na(newasthmadx_22), 1, 0),
-    gvh1600count_std = as.numeric(scale(gvh1600count))
-  ) %>%
-  filter(!is.na(gvh1600count_std) & !is.na(female))
-
-m_attrition <- glm(
-  attrited ~ gvh1600count_std + female,
-  data = df_eligible, family = binomial(link = "logit")
-)
-coeftest(m_attrition, vcov. = vcovHC, type = "HC1")
+  mutate(attrited = ifelse(is.na(newasthmadx_22), 1, 0)) %>%
+  filter(!is.na(gvh1600count) & !is.na(female))
+ 
+mu  <- mean(df_main_nomiss$gvh1600_rate)
+sdv <- sd(df_main_nomiss$gvh1600_rate)
+df_eligible$gvh1600rate_std_a <- (df_eligible$gvh1600_rate - mu) / sdv
+ 
+m_attrition <- glm(attrited ~ gvh1600rate_std_a + female,
+                   family = binomial, data = df_eligible)
+nobs(m_attrition)
+table(model.frame(m_attrition)$attrited)
+coeftest(m_attrition, vcov. = vcovHC, type = "HC0")
 exp(coef(m_attrition))
-exp(coefci(m_attrition, vcov. = vcovHC, type = "HC1"))
-# Result: exposure OR=1.11 (p=.044); female OR=0.62 (p<.001)
-# Direction: higher-exposed participants more likely to attrite
-# → Primary estimates are conservative (downward bias)
+exp(coefci(m_attrition, vcov. = vcovHC, type = "HC0"))
 
+# --- [16.2] Sample Flowchart Counts (Figure S1) ----
+step <- function(x, label) cat(sprintf("%-55s n = %5d\n", label, nrow(x)))
+ 
+d0 <- df
+step(d0, "0. FFCWS sample")
+ 
+d1 <- d0 %>% filter(ck6kint == 1)
+step(d1, "1. Participated at age 15")
+ 
+d2 <- d1 %>% filter(!is.na(gvh1600_rate))
+step(d2, "2. Valid age 15 GVA exposure data")
+ 
+d3 <- d2 %>% filter(ck7kint == 1)
+step(d3, "3. Participated at age 22")
+ 
+d4 <- d3 %>% filter(!is.na(anyasthmadx_15))
+cat("Missing age 15 asthma data:", nrow(d3) - nrow(d4), "\n")
+ 
+d5 <- d4 %>% filter(anyasthmadx_15 == 0)
+cat("Asthma diagnosis by age 15:", nrow(d4) - nrow(d5), "\n")
+ 
+d6 <- d5 %>% filter(!is.na(newasthmadx_22))
+cat("Missing age 22 asthma outcome:", nrow(d5) - nrow(d6), "\n")
+ 
+d7 <- d6 %>% tidyr::drop_na(age_t7, age_t6, female, smoking_t6, smoking_t7, vaping_t7,
+                            edu_t6, edu_t7, pov_t6, pov_t7, race, trct_pct_pov_t6, vc_rate15,
+                            household_smokers_t6, household_size_t6)
+cat("Missing covariate data:", nrow(d6) - nrow(d7), "\n")
+cat("Analytic sample:", nrow(d7), "| cases:", sum(d7$newasthmadx_22), "\n")
 
 # =============================================================================
 # [17] CHECK CLUSTERING ----
 # Tests whether multilevel modeling is warranted
 # =============================================================================
 
-# State-level clustering (**NEED TO BRING IN STATE AND TRACT IDENTIFIERS**)
-m_null_state <- glmer(
-  newasthmadx_22 ~ 1 + (1 | state_t6),
-  data   = df_main_nomiss,
-  family = binomial(link = "logit")
-)
+m_null_state <- glmer(newasthmadx_22 ~ 1 + (1 | state_t6),
+                      data = df_main_nomiss, family = binomial(link = "logit"))
 icc(m_null_state)
-# ICC = 0.039 — minimal state-level clustering; standard regression sufficient
-
-# Census tract-level clustering
-m_null_tract <- glmer(
-  newasthmadx_22 ~ 1 + (1 | trct_id6),
-  data   = df_main_nomiss,
-  family = binomial(link = "logit")
-)
+ 
+m_null_tract <- glmer(newasthmadx_22 ~ 1 + (1 | trct_id6),
+                      data = df_main_nomiss, family = binomial(link = "logit"))
 icc(m_null_tract)
-# ICC ≈ 0 / singular fit — no meaningful tract-level clustering
-
 
 # =============================================================================
 # [18] MAIN MODELS: INCIDENT ASTHMA (n=1,936) ----
@@ -825,161 +915,26 @@ out_main_list <- list(
                data = df_main_nomiss, family = binomial(link = "logit"))
 )
 
-# Results with robust SEs
-lapply(out_main_list, function(m) {
-  list(
-    n       = nobs(m),
-    robust  = coeftest(m, vcov. = vcovHC, type = "HC1"),
-    ci      = coefci(m,   vcov. = vcovHC, type = "HC1"),
-    OR      = exp(coef(m)["gvh1600rate_std"]),
-    OR_ci   = exp(coefci(m, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-  )
-})
-
-# Sex-specific ORs from M6 (linear combination: main + interaction)
-int_term <- grep("gvh1600rate_std:female|female:gvh1600rate_std",
-                 names(coef(out_main_list$m6_sex)), value = TRUE)
-# Females
-robust_ci_lincomb(out_main_list$m6_sex, setNames(c(1, 1), c("gvh1600rate_std", int_term)))
-# Males
-robust_ci_term(out_main_list$m6_sex, "gvh1600rate_std")
-
-
-# M5 main effect
-exp(coef(out_main_list$m5)["gvh1600rate_std"])
-exp(coefci(out_main_list$m5, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-# Main results summary:
-# M5 overall:  OR=1.25 (95% CI: 1.06–1.49), p=.010
-# M6 males:    OR=1.55 (95% CI: 1.24–1.94)
-# M6 females:  OR=1.06 (95% CI: 0.87–1.30), NS
-# Interaction: p=.006
-
-# output for supplemental tables 
-
-# ── Helper: extract all estimates from one model ──────────────────────────────
-extract_model <- function(mod, label) {
-  ct  <- coeftest(mod, vcov. = vcovHC, type = "HC1")
-  ci  <- coefci(mod,   vcov. = vcovHC, type = "HC1")
-  
-  terms <- rownames(ct)
-  
-  tibble(
-    term  = terms,
-    OR    = exp(ct[, "Estimate"]),
-    lower = exp(ci[, 1]),
-    upper = exp(ci[, 2]),
-    pval  = ct[, "Pr(>|z|)"],
-    model = label
-  )
-}
-
-# ── Format a single cell: "OR (LL–UL)" + p ───────────────────────────────────
-fmt_cell <- function(OR, lower, upper, pval) {
-  p_str <- ifelse(pval < .001, "< .001",
-                  ifelse(pval < .01,  formatC(pval, digits = 3, format = "f"),
-                         formatC(pval, digits = 3, format = "f")))
-  sprintf("%.2f (%.2f–%.2f)\np = %s", OR, lower, upper, p_str)
-}
-
-# ── Extract all models ────────────────────────────────────────────────────────
-results <- bind_rows(
-  extract_model(out_main_list$m1,     "M1"),
-  extract_model(out_main_list$m2,     "M2"),
-  extract_model(out_main_list$m3,     "M3"),
-  extract_model(out_main_list$m4,     "M4"),
-  extract_model(out_main_list$m5,     "M5"),
-  extract_model(out_main_list$m6_sex, "M6")
+# Robust coefficient tests for all models
+lapply(out_main_list, coeftest, vcov. = vcovHC, type = "HC1")
+ 
+# Table S1
+results_main <- bind_rows(
+  extract_robust(out_main_list$m1,     "M1"),
+  extract_robust(out_main_list$m2,     "M2"),
+  extract_robust(out_main_list$m3,     "M3"),
+  extract_robust(out_main_list$m4,     "M4"),
+  extract_robust(out_main_list$m5,     "M5"),
+  extract_robust(out_main_list$m6_sex, "M6")
 )
-
-# ── Build wide table (terms as rows, models as columns) ──────────────────────
-results_wide <- results %>%
-  mutate(cell = mapply(fmt_cell, OR, lower, upper, pval)) %>%
-  select(term, model, cell) %>%
-  tidyr::pivot_wider(names_from = model, values_from = cell, values_fill = "—")
-
-# ── Define covariate display order and labels ─────────────────────────────────
-term_labels <- c(
-  "(Intercept)"                    = "Intercept",
-  "gvh1600rate_std"                = "Gun Violence Exposure (1,600m), std.",
-  "gvh1600rate_std:female"         = "Gun Violence × Female (interaction)",
-  "female"                         = "Female (ref: Male)",
-  "age_t7"                         = "Age at Age 22 Assessment, std.",
-  "smoking_t6"                     = "Smoking, Past Month (Age 15)",
-  "smoking_t7"                     = "Smoking, Past Month (Age 22)",
-  "vaping_t7"                      = "Vaping, Past Year (Age 22)",
-  "pov_t6_std"                     = "Income-to-Poverty Ratio (Age 15), std.",
-  "pov_t7_std"                     = "Income-to-Poverty Ratio (Age 22), std.",
-  "edu_t62"                        = "Parental Education (Age 15): HS or Equivalent",
-  "edu_t63"                        = "Parental Education (Age 15): Some College",
-  "edu_t64"                        = "Parental Education (Age 15): College+",
-  "edu_t72"                        = "Own Education (Age 22): HS or Equivalent",
-  "edu_t73"                        = "Own Education (Age 22): Some College",
-  "edu_t74"                        = "Own Education (Age 22): College+",
-  "raceWhite"                      = "Race/Ethnicity: Non-Hispanic White (ref: NH Black)",
-  "raceHispanic"                   = "Race/Ethnicity: Hispanic",
-  "raceOther"                      = "Race/Ethnicity: Multiracial/Other",
-  "trct_pct_pov_t6_std"            = "Census Tract Poverty Rate (Age 15), std.",
-  "vc_rate15_std"                  = "County Violent Crime Rate (Age 15), std.",
-  "household_smokers_t6"           = "Household Smokers (Age 15)",
-  "household_size_t6"              = "Household Size (Age 15), std."
-)
-
-# Reorder rows to match term_labels order; keep any unlabeled terms at end
-results_wide <- results_wide %>%
-  mutate(
-    order = match(term, names(term_labels)),
-    label = ifelse(term %in% names(term_labels), term_labels[term], term)
-  ) %>%
-  arrange(order) %>%
-  select(label, M1, M2, M3, M4, M5, M6)
-
-# ── N per model ───────────────────────────────────────────────────────────────
-n_row <- tibble(
-  label = "N",
-  M1 = as.character(nobs(out_main_list$m1)),
-  M2 = as.character(nobs(out_main_list$m2)),
-  M3 = as.character(nobs(out_main_list$m3)),
-  M4 = as.character(nobs(out_main_list$m4)),
-  M5 = as.character(nobs(out_main_list$m5)),
-  M6 = as.character(nobs(out_main_list$m6_sex))
-)
-
-results_wide <- bind_rows(n_row, results_wide)
-
-# ── flextable ─────────────────────────────────────────────────────────────────
-ft <- flextable(results_wide) %>%
-  set_header_labels(
-    label = "Covariate",
-    M1 = "Model 1",
-    M2 = "Model 2",
-    M3 = "Model 3",
-    M4 = "Model 4",
-    M5 = "Model 5\n(Primary)",
-    M6 = "Model 6\n(Sex Interaction)"
-  ) %>%
-  bold(i = 1, part = "header") %>%
-  bold(j = 1) %>%
-  # Highlight exposure row
-  bold(i = ~ label == "Gun Violence Exposure (1,600m), std.") %>%
-  bg(i = ~ label == "Gun Violence Exposure (1,600m), std.", bg = "#f0f0f0") %>%
-  # Highlight interaction row
-  bold(i = ~ label == "Gun Violence × Female (interaction)") %>%
-  bg(i = ~ label == "Gun Violence × Female (interaction)", bg = "#f0f0f0") %>%
-  fontsize(size = 9, part = "all") %>%
-  font(fontname = "Times New Roman", part = "all") %>%
-  align(j = 2:7, align = "center", part = "all") %>%
-  align(j = 1, align = "left", part = "all") %>%
-  width(j = 1, width = 2.2) %>%
-  width(j = 2:7, width = 1.15) %>%
-  add_footer_lines("Note: Estimates are odds ratios (ORs) with 95% confidence intervals and p-values from logistic regression models with heteroskedasticity-robust standard errors (HC1). All continuous covariates standardized (mean = 0, SD = 1). Model 5 is the primary fully adjusted specification. Model 6 replaces the main effect of sex with a Gun Violence × Female interaction term; sex-specific ORs for Model 6 are reported in the main text. — = covariate not included in model.") %>%
-  fontsize(size = 8, part = "footer") %>%
-  set_table_properties(layout = "autofit")
-
-# ── Print / export ────────────────────────────────────────────────────────────
-ft  # renders in RStudio Viewer; copy from there into Word
-
-
+results_main %>% filter(term %in% c("gvh1600rate_std", "gvh1600rate_std:female"))
+table_s1 <- make_wide_table(results_main)
+save_table(table_s1, "table_s1_incident_asthma.docx")
+ 
+# Sex-specific ORs from M6 (female = main effect + interaction)
+int_term <- "gvh1600rate_std:female"
+robust_ci_term(out_main_list$m6_sex, "gvh1600rate_std")                                    # Males
+robust_ci_lincomb(out_main_list$m6_sex, setNames(c(1, 1), c("gvh1600rate_std", int_term))) # Females
 
 # =============================================================================
 # [19] SECONDARY ANALYTIC DATASETS ----
@@ -1004,7 +959,6 @@ add_std_vars <- function(data) {
 }
 
 # Shared covariate columns used across all secondary datasets
-# Note: gvh1600_rate corrected from earlier gvh1600rate (no underscore)
 secondary_covariates <- c(
   "idnum", "age_t7", "age_t6", "female", "race",
   "smoking_t7", "smoking_t6", "vaping_t7", "household_smokers_t6", "household_size_t6",
@@ -1018,309 +972,174 @@ secondary_covariates <- c(
 # Source: df_main_nomiss filtered to incident cases; outcomes joined from df_reduced
 # Only outcome variable drives case loss
 
-# [19.1a] Hospitalization among incident Dx (n=103)
+# [19.1a] Hospitalization among incident Dx
 df_newdx_hosp <- df_main_nomiss %>%
   filter(newasthmadx_22 == 1) %>%
   left_join(dplyr::select(df_reduced, idnum, hosp_asthma_yn), by = "idnum") %>%
   filter(!is.na(hosp_asthma_yn)) %>%
   as.data.frame()
-cat("Incident Dx | Hospitalization n =", nrow(df_newdx_hosp), "\n")  # n=103
-
-# [19.1b] Severity among incident Dx (n=106)
+cat("Incident Dx | Hospitalization n =", nrow(df_newdx_hosp), "\n")
+ 
+# [19.1b] Functional limitation among incident Dx
 df_newdx_sev <- df_main_nomiss %>%
   filter(newasthmadx_22 == 1) %>%
   left_join(dplyr::select(df_reduced, idnum, limit_asthma), by = "idnum") %>%
   filter(!is.na(limit_asthma)) %>%
   as.data.frame()
-cat("Incident Dx | Severity n =", nrow(df_newdx_sev), "\n")  # n=106
+cat("Incident Dx | Functional limitation n =", nrow(df_newdx_sev), "\n")
 
 # --- [19.2] Any Dx datasets (supplemental secondary outcomes) ----
-# Source: df_reduced filtered to anyasthmadx_22 == 1
 
-# [19.2a] Hospitalization among any Dx (n=527)
+# [19.2a] Hospitalization among any Dx
 df_anydx_hosp <- df_reduced %>%
   filter(anyasthmadx_22 == 1) %>%
   dplyr::select(all_of(secondary_covariates), hosp_asthma_yn) %>%
   na.omit() %>%
   as.data.frame() %>%
   add_std_vars()
-cat("Any Dx | Hospitalization n =", nrow(df_anydx_hosp), "\n")  # n=527
-
-# [19.2b] Severity among any Dx (n=533)
+cat("Any Dx | Hospitalization n =", nrow(df_anydx_hosp), "\n")
+ 
+# [19.2b] Functional limitation among any Dx
 df_anydx_sev <- df_reduced %>%
   filter(anyasthmadx_22 == 1) %>%
   dplyr::select(all_of(secondary_covariates), limit_asthma) %>%
   na.omit() %>%
   as.data.frame() %>%
   add_std_vars()
-cat("Any Dx | Severity n =", nrow(df_anydx_sev), "\n")  # n=533
-
+cat("Any Dx | Functional limitation n =", nrow(df_anydx_sev), "\n")
 
 # =============================================================================
-# [20] HOSPITALIZATION MODELS ----
+# [20] HOSPITALIZATION MODELS: FIRTH PENALIZED LOGISTIC REGRESSION (Tables S2, S4) ----
+# Profile penalized-likelihood CIs (logistf default).
 # =============================================================================
-
-# Primary: incident Dx sample (n=103)
-out_hosp_new_list <- list(
-  m1 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7,
-           data = df_newdx_hosp, family = binomial(link = "logit")),
-  m2 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std,
-           data = df_newdx_hosp, family = binomial(link = "logit")),
-  m3 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race,
-           data = df_newdx_hosp, family = binomial(link = "logit")),
-  m4 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std,
-           data = df_newdx_hosp, family = binomial(link = "logit")),
-  # M5: fully adjusted [PRIMARY]
-  m5 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
-             household_smokers_t6 + household_size_t6,
-           data = df_newdx_hosp, family = binomial(link = "logit")),
-  # M6: sex interaction — NS (p=.631)
-  m6_sex = glm(hosp_asthma_yn ~ gvh1600rate_std * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
-                 pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
-                 household_smokers_t6 + household_size_t6,
-               data = df_newdx_hosp, family = binomial(link = "logit"))
-)
-# Note: warnings re fitted probabilities of 0/1 expected given small n and binary outcome.
-# edu_t74 shows large SE due to quasi-complete separation — does not affect primary estimate.
-# Unable to test for moderation by race due to small cell sizes. 
-
-lapply(out_hosp_new_list, function(m) summary(m))
-lapply(out_hosp_new_list, function(m) nobs(m))
-
-# Robust SEs and CIs: M5 primary result — OR = 4.59 (95% CI: 1.56–13.47, p=.006)
-exp(coef(out_hosp_new_list$m5)["gvh1600rate_std"])
-exp(coefci(out_hosp_new_list$m5, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_new_list$m4)["gvh1600rate_std"])
-exp(coefci(out_hosp_new_list$m4, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_new_list$m3)["gvh1600rate_std"])
-exp(coefci(out_hosp_new_list$m3, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_new_list$m2)["gvh1600rate_std"])
-exp(coefci(out_hosp_new_list$m2, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_new_list$m1)["gvh1600rate_std"])
-exp(coefci(out_hosp_new_list$m1, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-# sex interaaction: p = .862
-coeftest(out_hosp_new_list$m6, vcov. = vcovHC, type = "HC1")
-coefci(out_hosp_new_list$m6,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-# Supplemental: any Dx sample (n=527)
-out_hosp_any_list <- list(
-  m1 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7,
-           data = df_anydx_hosp, family = binomial(link = "logit")),
-  m2 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std,
-           data = df_anydx_hosp, family = binomial(link = "logit")),
-  m3 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race,
-           data = df_anydx_hosp, family = binomial(link = "logit")),
-  m4 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std,
-           data = df_anydx_hosp, family = binomial(link = "logit")),
-  # M5: fully adjusted — OR = 1.53 (95% CI: 1.19–1.96, p=.001)
-  m5 = glm(hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
-             household_smokers_t6 + household_size_t6,
-           data = df_anydx_hosp, family = binomial(link = "logit")),
-  # M6: sex interaction — NS (interaction p=.101)
-  m6_sex = glm(hosp_asthma_yn ~ gvh1600rate_std * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
-                 pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
-                 household_smokers_t6 + household_size_t6,
-               data = df_anydx_hosp, family = binomial(link = "logit"))
-)
-
-lapply(out_hosp_any_list, summary)
-lapply(out_hosp_any_list, function(m) nobs(m))
-
-exp(coef(out_hosp_any_list$m6)["gvh1600rate_std"])
-exp(coefci(out_hosp_any_list$m6, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-exp(coef(out_hosp_any_list$m6)["gvh1600rate_std:female"])
-exp(coefci(out_hosp_any_list$m6, vcov. = vcovHC, type = "HC1")["gvh1600rate_std:female", ])
-
-exp(coef(out_hosp_any_list$m5)["gvh1600rate_std"])
-exp(coefci(out_hosp_any_list$m5, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_any_list$m4)["gvh1600rate_std"])
-exp(coefci(out_hosp_any_list$m4, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_any_list$m3)["gvh1600rate_std"])
-exp(coefci(out_hosp_any_list$m3, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_any_list$m2)["gvh1600rate_std"])
-exp(coefci(out_hosp_any_list$m2, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-exp(coef(out_hosp_any_list$m1)["gvh1600rate_std"])
-exp(coefci(out_hosp_any_list$m1, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-
-# generate table for supplemental materials 
-# ── Helper: extract all estimates from one model ──────────────────────────────
-extract_model <- function(mod, label) {
-  ct  <- coeftest(mod, vcov. = vcovHC, type = "HC1")
-  ci  <- coefci(mod,   vcov. = vcovHC, type = "HC1")
-  
-  tibble(
-    term  = rownames(ct),
-    OR    = exp(ct[, "Estimate"]),
-    lower = exp(ci[, 1]),
-    upper = exp(ci[, 2]),
-    pval  = ct[, "Pr(>|z|)"],
-    model = label
+ 
+# --- [20.1] Incident Dx sample (Table S2) ----
+# Sparse cells: smoking at age 15 omitted; own education at age 22 collapsed
+# to binary (some college or more vs. high school or less)
+table(df_newdx_hosp$smoking_t6, df_newdx_hosp$hosp_asthma_yn)
+table(df_newdx_hosp$edu_t7,     df_newdx_hosp$hosp_asthma_yn)
+ 
+df_newdx_hosp <- df_newdx_hosp %>%
+  mutate(
+    edu_t7_bin = case_when(
+      edu_t7 %in% c("1", "2") ~ "HS or Less",
+      edu_t7 %in% c("3", "4") ~ "Some College or More",
+      TRUE ~ NA_character_
+    ),
+    edu_t7_bin = factor(edu_t7_bin, levels = c("HS or Less", "Some College or More"))
   )
-}
-
-# ── Format cell: OR (LL–UL) only, p on second line ───────────────────────────
-fmt_cell <- function(OR, lower, upper, pval) {
-  p_str <- ifelse(pval < .001, "< .001", formatC(pval, digits = 3, format = "f"))
-  sprintf("%.2f (%.2f\u2013%.2f)", OR, lower, upper)
-}
-
-# ── Term labels (adjust suffixes to match your actual coef names) ─────────────
-term_labels <- c(
-  "(Intercept)"          = "Intercept",
-  "gvh1600rate_std"      = "Gun Violence Exposure (1,600m), std.",
-  "gvh1600rate_std:female" = "Gun Violence \u00d7 Female (interaction)",
-  "female"               = "Female (ref: Male)",
-  "age_t7"               = "Age at Age 22 Assessment, std.",
-  "smoking_t6"           = "Smoking, Past Month (Age 15)",
-  "smoking_t7"           = "Smoking, Past Month (Age 22)",
-  "vaping_t7"            = "Vaping, Past Year (Age 22)",
-  "pov_t6_std"           = "Income-to-Poverty Ratio (Age 15), std.",
-  "pov_t7_std"           = "Income-to-Poverty Ratio (Age 22), std.",
-  "edu_t62"              = "Parental Education (Age 15): HS or Equivalent",
-  "edu_t63"              = "Parental Education (Age 15): Some College",
-  "edu_t64"              = "Parental Education (Age 15): College+",
-  "edu_t72"              = "Own Education (Age 22): HS or Equivalent",
-  "edu_t73"              = "Own Education (Age 22): Some College",
-  "edu_t74"              = "Own Education (Age 22): College+",
-  "raceWhite"            = "Race/Ethnicity: Non-Hispanic White (ref: NH Black)",
-  "raceHispanic"         = "Race/Ethnicity: Hispanic",
-  "raceMultiracial"      = "Race/Ethnicity: Multiracial/Other",
-  "trct_pct_pov_t6_std"  = "Census Tract Poverty Rate (Age 15), std.",
-  "vc_rate15_std"        = "County Violent Crime Rate (Age 15), std.",
-  "household_smokers_t6" = "Household Smokers (Age 15)",
-  "household_size_t6"    = "Household Size (Age 15), std."
+table(df_newdx_hosp$edu_t7, df_newdx_hosp$edu_t7_bin, useNA = "always")
+ 
+out_hosp_firth_list <- list(
+  m1 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t7 + vaping_t7,
+    data = df_newdx_hosp),
+ 
+  m2 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7_bin + edu_t6 + pov_t6_std,
+    data = df_newdx_hosp),
+ 
+  m3 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7_bin + edu_t6 + pov_t6_std + race,
+    data = df_newdx_hosp),
+ 
+  m4 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7_bin + edu_t6 + pov_t6_std + race +
+      trct_pct_pov_t6_std + vc_rate15_std,
+    data = df_newdx_hosp),
+ 
+  m5 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7_bin + edu_t6 + pov_t6_std + race +
+      trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+    data = df_newdx_hosp),
+ 
+  m6_sex = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std * female + age_t7 + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7_bin + edu_t6 + pov_t6_std + race +
+      trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+    data = df_newdx_hosp)
 )
-
-shared_footer <- "Note: Estimates are odds ratios (ORs) with 95% confidence intervals from logistic regression models with heteroskedasticity-robust standard errors (HC1). All continuous covariates standardized (mean = 0, SD = 1). Model 5 is the primary fully adjusted specification. Model 6 replaces the main effect of sex with a Gun Violence \u00d7 Female interaction term. \u2014 = covariate not included in model."
-
-# ── Generic table-builder function ───────────────────────────────────────────
-build_hosp_table <- function(model_list, model_names, col_labels, n_row_vals,
-                             highlight_interaction = TRUE, footer_note) {
-  results <- bind_rows(
-    mapply(extract_model, model_list, model_names, SIMPLIFY = FALSE)
-  )
-  
-  results_wide <- results %>%
-    mutate(cell = mapply(fmt_cell, OR, lower, upper, pval)) %>%
-    select(term, model, cell) %>%
-    pivot_wider(names_from = model, values_from = cell, values_fill = "\u2014") %>%
-    mutate(
-      order = match(term, names(term_labels)),
-      label = ifelse(term %in% names(term_labels), term_labels[term], term)
-    ) %>%
-    arrange(order) %>%
-    select(label, all_of(model_names))
-  
-  n_row <- as_tibble(
-    c(list(label = "N"), setNames(as.list(as.character(n_row_vals)), model_names))
-  )
-  results_wide <- bind_rows(n_row, results_wide)
-  
-  # Build flextable with do.call to avoid !!! splicing issue
-  ft <- flextable(results_wide)
-  ft <- do.call(set_header_labels,
-                c(list(x = ft), list(label = "Covariate"), as.list(col_labels)))
-  ft <- ft %>%
-    bold(i = 1, part = "header") %>%
-    bold(j = 1) %>%
-    bg(i = ~ label == "Gun Violence Exposure (1,600m), std.", bg = "#f0f0f0") %>%
-    bold(i = ~ label == "Gun Violence Exposure (1,600m), std.")
-  
-  if (highlight_interaction) {
-    ft <- ft %>%
-      bg(i = ~ label == "Gun Violence \u00d7 Female (interaction)", bg = "#f0f0f0") %>%
-      bold(i = ~ label == "Gun Violence \u00d7 Female (interaction)")
-  }
-  
-  ft %>%
-    fontsize(size = 9, part = "all") %>%
-    font(fontname = "Times New Roman", part = "all") %>%
-    align(j = 2:(length(model_names) + 1), align = "center", part = "all") %>%
-    align(j = 1, align = "left", part = "all") %>%
-    width(j = 1, width = 2.2) %>%
-    width(j = 2:(length(model_names) + 1), width = 1.1) %>%
-    add_footer_lines(footer_note) %>%
-    fontsize(size = 8, part = "footer") %>%
-    set_table_properties(layout = "autofit")
-}
-
-# ── Table S2a: Incident Diagnosis Sample (n = 103) ───────────────────────────
-ft_hosp_new <- build_hosp_table(
-  model_list = list(
-    out_hosp_new_list$m1,
-    out_hosp_new_list$m2,
-    out_hosp_new_list$m3,
-    out_hosp_new_list$m4,
-    out_hosp_new_list$m5,
-    out_hosp_new_list$m6_sex
-  ),
-  model_names = c("M1", "M2", "M3", "M4", "M5", "M6"),
-  col_labels  = c(
-    M1 = "Model 1", M2 = "Model 2", M3 = "Model 3",
-    M4 = "Model 4", M5 = "Model 5\n(Primary)", M6 = "Model 6\n(Sex Interaction)"
-  ),
-  n_row_vals  = c(
-    nobs(out_hosp_new_list$m1), nobs(out_hosp_new_list$m2),
-    nobs(out_hosp_new_list$m3), nobs(out_hosp_new_list$m4),
-    nobs(out_hosp_new_list$m5), nobs(out_hosp_new_list$m6_sex)
-  ),
-  footer_note = paste(shared_footer,
-                      "Separation warnings for edu_t74 reflect small cell sizes and do not affect the primary exposure estimate.")
+ 
+lapply(out_hosp_firth_list, summary)
+ 
+results_hosp_new <- bind_rows(
+  extract_firth(out_hosp_firth_list$m1,     "M1"),
+  extract_firth(out_hosp_firth_list$m2,     "M2"),
+  extract_firth(out_hosp_firth_list$m3,     "M3"),
+  extract_firth(out_hosp_firth_list$m4,     "M4"),
+  extract_firth(out_hosp_firth_list$m5,     "M5"),
+  extract_firth(out_hosp_firth_list$m6_sex, "M6")
 )
-
-ft_hosp_new  # renders in RStudio Viewer
-
-# ── Table S2b: Any Diagnosis Sample (n = 527) ────────────────────────────────
-ft_hosp_any <- build_hosp_table(
-  model_list = list(
-    out_hosp_any_list$m1,
-    out_hosp_any_list$m2,
-    out_hosp_any_list$m3,
-    out_hosp_any_list$m4,
-    out_hosp_any_list$m5,
-    out_hosp_any_list$m6_sex
-  ),
-  model_names = c("M1", "M2", "M3", "M4", "M5", "M6"),
-  col_labels  = c(
-    M1 = "Model 1", M2 = "Model 2", M3 = "Model 3",
-    M4 = "Model 4", M5 = "Model 5\n(Primary)", M6 = "Model 6\n(Sex Interaction)"
-  ),
-  n_row_vals  = c(
-    nobs(out_hosp_any_list$m1), nobs(out_hosp_any_list$m2),
-    nobs(out_hosp_any_list$m3), nobs(out_hosp_any_list$m4),
-    nobs(out_hosp_any_list$m5), nobs(out_hosp_any_list$m6_sex)
-  ),
-  footer_note = shared_footer
+results_hosp_new %>% filter(term %in% c("gvh1600rate_std", "gvh1600rate_std:female"))
+table_s2 <- make_wide_table(results_hosp_new)
+save_table(table_s2, "table_s2_hosp_incident.docx")
+ 
+# --- [20.2] Any Dx sample (Table S4) ----
+# Primary covariate specification (no sparse-cell modifications needed)
+table(df_anydx_hosp$smoking_t6, df_anydx_hosp$hosp_asthma_yn)
+table(df_anydx_hosp$edu_t7,     df_anydx_hosp$hosp_asthma_yn)
+ 
+out_hosp_firth_anydx_list <- list(
+  m1 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7,
+    data = df_anydx_hosp),
+ 
+  m2 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std,
+    data = df_anydx_hosp),
+ 
+  m3 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race,
+    data = df_anydx_hosp),
+ 
+  m4 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race +
+      trct_pct_pov_t6_std + vc_rate15_std,
+    data = df_anydx_hosp),
+ 
+  m5 = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race +
+      trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+    data = df_anydx_hosp),
+ 
+  m6_sex = logistf(
+    hosp_asthma_yn ~ gvh1600rate_std * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
+      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race +
+      trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+    data = df_anydx_hosp)
 )
-
-ft_hosp_any 
-
-
-
+ 
+lapply(out_hosp_firth_anydx_list, summary)
+ 
+results_hosp_any <- bind_rows(
+  extract_firth(out_hosp_firth_anydx_list$m1,     "M1"),
+  extract_firth(out_hosp_firth_anydx_list$m2,     "M2"),
+  extract_firth(out_hosp_firth_anydx_list$m3,     "M3"),
+  extract_firth(out_hosp_firth_anydx_list$m4,     "M4"),
+  extract_firth(out_hosp_firth_anydx_list$m5,     "M5"),
+  extract_firth(out_hosp_firth_anydx_list$m6_sex, "M6")
+)
+results_hosp_any %>% filter(term %in% c("gvh1600rate_std", "gvh1600rate_std:female"))
+table_s4 <- make_wide_table(results_hosp_any)
+save_table(table_s4, "table_s4_hosp_anydx.docx")
+ 
+ 
 # =============================================================================
-# [21] SEVERITY MODELS (FUNCTIONAL LIMITATION) ----
+# [21] FUNCTIONAL LIMITATION MODELS (Tables S3, S5) ----
+# Linear regression; outcome standardized within each sample. HC1 SEs.
 # =============================================================================
-
-df_newdx_sev$limit_asthma_std <- scale(df_newdx_sev$limit_asthma)
-
-# Primary: incident Dx sample (n=106)
+ 
+# --- [21.1] Incident Dx sample (Table S3) ----
+df_newdx_sev$limit_asthma_std <- as.numeric(scale(df_newdx_sev$limit_asthma))
+ 
 out_sev_new_list <- list(
   m1 = lm(limit_asthma_std ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7,
           data = df_newdx_sev),
@@ -1338,39 +1157,30 @@ out_sev_new_list <- list(
             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
             household_smokers_t6 + household_size_t6,
           data = df_newdx_sev),
-  # M6: sex interaction — NS (interaction p=.834)
+  # M6: sex interaction
   m6_sex = lm(limit_asthma_std ~ gvh1600rate_std * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
                 pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
                 household_smokers_t6 + household_size_t6,
               data = df_newdx_sev)
 )
-
-lapply(out_sev_new_list, function(m) summary(m))
-lapply(out_sev_new_list, function(m) nobs(m))
-
-# Robust SEs and CIs: M6 interaction: B = -0.03 (95% CI: -0.36–0.29, p=.834)
-coeftest(out_sev_new_list$m6_sex, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_new_list$m6_sex,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-# Robust SEs and CIs: M5 primary result — B = 0.25 (95% CI: 0.06–0.44, p=.010)
-coeftest(out_sev_new_list$m5, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_new_list$m5,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_new_list$m4, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_new_list$m4,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_new_list$m3, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_new_list$m3,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_new_list$m2, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_new_list$m2,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_new_list$m1, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_new_list$m1,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-
-# Supplemental: any Dx sample (n=533)
-df_anydx_sev$limit_asthma_std <- scale(df_anydx_sev$limit_asthma)
+ 
+lapply(out_sev_new_list, coeftest, vcov. = vcovHC, type = "HC1")
+ 
+results_sev_new <- bind_rows(
+  extract_robust(out_sev_new_list$m1,     "M1", transform = identity),
+  extract_robust(out_sev_new_list$m2,     "M2", transform = identity),
+  extract_robust(out_sev_new_list$m3,     "M3", transform = identity),
+  extract_robust(out_sev_new_list$m4,     "M4", transform = identity),
+  extract_robust(out_sev_new_list$m5,     "M5", transform = identity),
+  extract_robust(out_sev_new_list$m6_sex, "M6", transform = identity)
+)
+results_sev_new %>% filter(term %in% c("gvh1600rate_std", "gvh1600rate_std:female"))
+table_s3 <- make_wide_table(results_sev_new)
+save_table(table_s3, "table_s3_limitation_incident.docx")
+ 
+# --- [21.2] Any Dx sample (Table S5) ----
+df_anydx_sev$limit_asthma_std <- as.numeric(scale(df_anydx_sev$limit_asthma))
+ 
 out_sev_any_list <- list(
   m1 = lm(limit_asthma_std ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7,
           data = df_anydx_sev),
@@ -1383,224 +1193,185 @@ out_sev_any_list <- list(
   m4 = lm(limit_asthma_std ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std,
           data = df_anydx_sev),
-  # M5: fully adjusted — B = 0.10 (95% CI: 0.02–0.17, p=.017)
+  # M5: fully adjusted
   m5 = lm(limit_asthma_std ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
             pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + trct_pct_pov_t6_std + vc_rate15_std +
             race + household_smokers_t6 + household_size_t6,
           data = df_anydx_sev),
-  # M6: sex interaction — NS (interaction p=.930)
+  # M6: sex interaction
   m6_sex = lm(limit_asthma_std ~ gvh1600rate_std * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
                 pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + trct_pct_pov_t6_std + vc_rate15_std +
                 race + household_smokers_t6 + household_size_t6,
               data = df_anydx_sev)
 )
-
-lapply(out_sev_any_list, summary)
-lapply(out_sev_any_list, function(m) nobs(m))
-
-coeftest(out_sev_any_list$m6_sex, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_any_list$m6_sex,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_any_list$m5, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_any_list$m5,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_any_list$m4, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_any_list$m4,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_any_list$m3, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_any_list$m3,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_any_list$m2, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_any_list$m2,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-coeftest(out_sev_any_list$m1, vcov. = vcovHC, type = "HC1")
-coefci(out_sev_any_list$m1,   vcov. = vcovHC, type = "HC1", level = 0.95)
-
-
+ 
+lapply(out_sev_any_list, coeftest, vcov. = vcovHC, type = "HC1")
+ 
+results_sev_any <- bind_rows(
+  extract_robust(out_sev_any_list$m1,     "M1", transform = identity),
+  extract_robust(out_sev_any_list$m2,     "M2", transform = identity),
+  extract_robust(out_sev_any_list$m3,     "M3", transform = identity),
+  extract_robust(out_sev_any_list$m4,     "M4", transform = identity),
+  extract_robust(out_sev_any_list$m5,     "M5", transform = identity),
+  extract_robust(out_sev_any_list$m6_sex, "M6", transform = identity)
+)
+results_sev_any %>% filter(term %in% c("gvh1600rate_std", "gvh1600rate_std:female"))
+table_s5 <- make_wide_table(results_sev_any)
+save_table(table_s5, "table_s5_limitation_anydx.docx")
 
 # =============================================================================
-# [22] SUPPLEMENTAL: SPATIAL SENSITIVITY ANALYSES ----
-# Tests whether associations hold at closer residential proximities (1000m, 500m)
-# All models use fully adjusted M5 covariate specification
-# Sample: df_main_nomiss (n=1,936)
+# [22] SUPPLEMENTAL: SPATIAL SENSITIVITY ANALYSES (Figure S2) ----
+# Exposure entered as the unstandardized annualized rate (OR per additional
+# incident per year) at 1,600m, 1,000m, and 500m. M5 covariates. HC1 SEs.
 # =============================================================================
-
+ 
 out_spatial_list <- list(
-  
+ 
   # --- Main effects ---
-  
-  # 1600m [primary; included for comparison]
-  # OR = 1.22 (95% CI: 1.03–1.45, p=.022)
   m_1600 = glm(newasthmadx_22 ~ gvh1600_rate + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
                  pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
                  household_smokers_t6 + household_size_t6,
                data = df_main_nomiss, family = binomial(link = "logit")),
-  
-  # 1000m — significant; slightly attenuated vs. 1600m
-  # OR = 1.21 (95% CI: 1.02–1.44, p=.031)
+ 
   m_1000 = glm(newasthmadx_22 ~ gvh1000_rate + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
                  pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
                  household_smokers_t6 + household_size_t6,
                data = df_main_nomiss, family = binomial(link = "logit")),
-  
-  # 500m — NS in fully adjusted model (p=.166)
-  # OR = 1.13 (95% CI: 0.95–1.34)
+ 
   m_500  = glm(newasthmadx_22 ~ gvh500_rate + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
                  pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
                  household_smokers_t6 + household_size_t6,
                data = df_main_nomiss, family = binomial(link = "logit")),
-  
+ 
   # --- Sex interaction models ---
-  
-  # 1600m × sex: significant interaction (p=.006)
-  # Male OR = 1.50 (95% CI: 1.21–1.85); Female OR = 1.03 (NS)
   m_1600_sex = glm(newasthmadx_22 ~ gvh1600_rate * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
                      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
                      household_smokers_t6 + household_size_t6,
                    data = df_main_nomiss, family = binomial(link = "logit")),
-  
-  # 1000m × sex: significant interaction (p=.041)
-  # Male OR = 1.42 (95% CI: 1.15–1.76); Female OR = 1.06 (NS)
+ 
   m_1000_sex = glm(newasthmadx_22 ~ gvh1000_rate * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
                      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
                      household_smokers_t6 + household_size_t6,
                    data = df_main_nomiss, family = binomial(link = "logit")),
-  
-  # 500m × sex: marginal interaction (p=.092)
-  # Male OR = 1.36 (95% CI: 1.07–1.73); Female OR = 1.07 (NS)
+ 
   m_500_sex  = glm(newasthmadx_22 ~ gvh500_rate * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
                      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
                      household_smokers_t6 + household_size_t6,
                    data = df_main_nomiss, family = binomial(link = "logit"))
 )
-
-# Robust SEs, CIs, and n for all spatial models
-lapply(out_spatial_list, function(m) {
-  list(coeftest = coeftest(m, vcov. = vcovHC, type = "HC1"),
-       coefci   = coefci(m,   vcov. = vcovHC, type = "HC1", level = 0.95),
-       n        = nobs(m))
-})
-
-# Summary table of primary exposure ORs across distances
-spatial_summary <- lapply(names(out_spatial_list), function(nm) {
-  m       <- out_spatial_list[[nm]]
-  exp_var <- grep("rate$", names(coef(m)), value = TRUE)[1]
-  ci      <- coefci(m, vcov. = vcovHC, type = "HC1")
-  data.frame(
-    model    = nm,
-    exposure = exp_var,
-    OR       = round(exp(coef(m)[exp_var]), 3),
-    lower95  = round(exp(ci[exp_var, 1]), 3),
-    upper95  = round(exp(ci[exp_var, 2]), 3)
-  )
-})
-do.call(rbind, spatial_summary)
-
-# Results summary (main effects):
-# 1600m: OR=1.22 (1.03–1.45), p=.022 [primary]
-# 1000m: OR=1.21 (1.02–1.44), p=.031 [consistent]
-# 500m:  OR=1.13 (0.95–1.34), p=.166 [NS; attenuated at closer proximity]
-#
-# Results summary (sex interactions):
-# 1600m × sex: interaction p=.006 — males OR=1.50 (1.21–1.85); females NS
-# 1000m × sex: interaction p=.041 — males OR=1.42 (1.15–1.76); females NS
-# 500m  × sex: interaction p=.092 — marginal; males OR=1.36 (1.07–1.73); females NS
-
-
+ 
+lapply(out_spatial_list, coeftest, vcov. = vcovHC, type = "HC1")
+ 
+# Overall, male, and female ORs per additional incident at each buffer
+buffers <- c("1,600m" = "gvh1600_rate", "1,000m" = "gvh1000_rate", "500m" = "gvh500_rate")
+models_main <- list(out_spatial_list$m_1600,     out_spatial_list$m_1000,     out_spatial_list$m_500)
+models_sex  <- list(out_spatial_list$m_1600_sex, out_spatial_list$m_1000_sex, out_spatial_list$m_500_sex)
+ 
+fp <- bind_rows(lapply(seq_along(buffers), function(i) {
+  v  <- buffers[[i]]
+  ov <- robust_ci_term(models_main[[i]], v)
+  ml <- robust_ci_term(models_sex[[i]],  v)
+  fm <- unname(female_or(models_sex[[i]], v))   # OR, lower, upper
+  tibble(buffer = names(buffers)[i],
+         group  = c("Overall", "Males", "Females"),
+         OR     = c(ov$estimate, ml$estimate, fm[1]),
+         lo     = c(ov$l95,      ml$l95,      fm[2]),
+         hi     = c(ov$u95,      ml$u95,      fm[3]))
+}))
+fp
+fp$buffer <- factor(fp$buffer, levels = names(buffers))
+fp$group  <- factor(fp$group,  levels = c("Females", "Males", "Overall"))
+ 
+# --- Figure S2: spatial buffer forest plot ----
+figS2_spatial <- ggplot(fp, aes(x = OR, y = group)) +
+  geom_vline(xintercept = 1, linetype = "dashed", colour = "grey50") +
+  geom_errorbar(aes(xmin = lo, xmax = hi), width = 0.15, orientation = "y") +
+  geom_point(size = 2) +
+  facet_grid(buffer ~ ., switch = "y") +
+  scale_x_log10() +
+  labs(x = "Odds ratio per additional deadly gun violence incident (log scale)", y = NULL) +
+  theme_classic() +
+  theme(strip.placement = "outside", strip.text.y.left = element_text(angle = 0))
+ 
+print(figS2_spatial)
+ggsave(file.path(out_dir, "figS2_spatial_buffers.png"), figS2_spatial,
+       width = 6, height = 5, dpi = 500)
+ 
+ 
 # =============================================================================
-# [23] SUPPLEMENTAL: NULL FINDINGS AT AGE 15 ----
-# Tests whether DGV at age 15 was associated with asthma at age 15
+# [23] SUPPLEMENTAL: FALSIFICATION TESTS AT AGE 15 ----
+# Tests whether DGV at age 15 was associated with asthma at or before age 15.
 # Two outcomes: incident dx Y9→Y15 (newasthmadx_15) and prevalent dx at Y15
 # (anyasthmadx_15). Separate datasets per outcome to avoid unnecessary case loss.
-# Expected: NS for gun violence exposure — confirms no pre-existing association
-# that could confound primary Y22 findings.
+# HC1 SEs.
 # =============================================================================
-
+ 
 y15_covariates <- c(
   "idnum", "age_t6", "female", "race", "smoking_t6",
   "household_smokers_t6", "household_size_t6",
   "gvh1600count", "gvh1600_rate", "edu_t6", "pov_t6", "trct_pct_pov_t6", "vc_rate15"
 )
-
-# --- [23.1] Incident asthma Y9→Y15 (n=2,372) ----
+ 
+# --- [23.1] Incident asthma Y9→Y15 ----
 df_newdx_y15 <- df_reduced %>%
   dplyr::select(all_of(y15_covariates), newasthmadx_15) %>%
   na.omit() %>%
   as.data.frame() %>%
   mutate(
     gvh1600count_std    = as.numeric(scale(gvh1600count)),
-    gvh1600rate_std    = as.numeric(scale(gvh1600_rate)),
+    gvh1600rate_std     = as.numeric(scale(gvh1600_rate)),
     vc_rate15_std       = as.numeric(scale(vc_rate15)),
     pov_t6_std          = as.numeric(scale(pov_t6)),
     trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6))
   )
 df_newdx_y15$edu_t6 <- factor(df_newdx_y15$edu_t6)
-cat("Incident dx Y9→Y15 n =", nrow(df_newdx_y15), "\n")  # n=2,372
-
-# --- [23.2] Prevalent asthma at Y15 (n=3,279) ----
+cat("Incident dx Y9→Y15 n =", nrow(df_newdx_y15), "\n")
+ 
+# --- [23.2] Prevalent asthma at Y15 ----
 df_anydx_y15 <- df_reduced %>%
   dplyr::select(all_of(y15_covariates), anyasthmadx_15) %>%
   na.omit() %>%
   as.data.frame() %>%
   mutate(
     gvh1600count_std    = as.numeric(scale(gvh1600count)),
-    gvh1600rate_std    = as.numeric(scale(gvh1600_rate)),
+    gvh1600rate_std     = as.numeric(scale(gvh1600_rate)),
     vc_rate15_std       = as.numeric(scale(vc_rate15)),
     pov_t6_std          = as.numeric(scale(pov_t6)),
     trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6))
   )
 df_anydx_y15$edu_t6 <- factor(df_anydx_y15$edu_t6)
-cat("Prevalent dx at Y15 n =", nrow(df_anydx_y15), "\n")  # n=3,279
-
+cat("Prevalent dx at Y15 n =", nrow(df_anydx_y15), "\n")
+ 
 # --- [23.3] Models ----
-
-# Incident asthma Y9→Y15 — Result: OR=1.00 (95% CI: 0.87–1.14, p=.953) — NS
 m_newdx_y15 <- glm(
   newasthmadx_15 ~ gvh1600rate_std + age_t6 + female + smoking_t6 +
     edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
     household_smokers_t6 + household_size_t6,
   data = df_newdx_y15, family = binomial(link = "logit"))
-
-summary(m_newdx_y15)
+ 
+nobs(m_newdx_y15); table(model.frame(m_newdx_y15)[[1]])
 coeftest(m_newdx_y15, vcov. = vcovHC, type = "HC1")
-coefci(m_newdx_y15,   vcov. = vcovHC, type = "HC1", level = 0.95)
 exp(coef(m_newdx_y15)["gvh1600rate_std"])
 exp(coefci(m_newdx_y15, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-# OR=1.02 (95% CI: 0.89–1.17), p=.743
-
-# Prevalent asthma at Y15 — Result: OR=1.00 (95% CI: 0.92–1.09, p=.991) — NS
+ 
 m_anydx_y15 <- glm(
   anyasthmadx_15 ~ gvh1600rate_std + age_t6 + female + smoking_t6 +
     edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
     household_smokers_t6 + household_size_t6,
   data = df_anydx_y15, family = binomial(link = "logit"))
-
-summary(m_anydx_y15)
+ 
+nobs(m_anydx_y15); table(model.frame(m_anydx_y15)[[1]])
 coeftest(m_anydx_y15, vcov. = vcovHC, type = "HC1")
-coefci(m_anydx_y15,   vcov. = vcovHC, type = "HC1", level = 0.95)
 exp(coef(m_anydx_y15)["gvh1600rate_std"])
 exp(coefci(m_anydx_y15, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-# OR=1.01 (95% CI: 0.92–1.10), p=.870
-
-# Summary of null Y15 findings:
-# Incident dx Y9→Y15: OR=1.02 (95% CI: 0.89–1.17), p=.743 — NS
-# Prevalent dx at Y15: OR=1.01 (95% CI: 0.92–1.10), p=.870 — NS
-# Interpretation: gun violence exposure at Y15 was not associated with concurrent
-# or prior asthma, supporting a prospective relationship with Y22 outcomes
-# and ruling out reverse causation.
-
-
+ 
+ 
 # =============================================================================
 # [24] SUPPLEMENTAL: BUILT ENVIRONMENT SENSITIVITY ----
-# Adjusts for interviewer-rated housing/neighborhood conditions
-# In-home observations conducted only for hard-to-reach/non-respondent
-# participants — subsample is approximately half the full sample (n=529)
-# Only 31 incident asthma cases; interpret with caution
-# Primary question: does the association persist after adjusting for
-# environmental asthma triggers that co-occur with gun violence?
+# Participants with age 15 in-home assessments; adjusts for the 12-item
+# interviewer-rated built environment index (Section 11). HC1 SEs.
 # =============================================================================
-
-# --- [24.1] Analytic dataset (n=529; incident cases n=31) ----
+ 
 be_covariates <- c(
   "idnum", "age_t7", "female", "race",
   "smoking_t7", "smoking_t6", "vaping_t7", "household_smokers_t6", "household_size_t6",
@@ -1610,14 +1381,14 @@ be_covariates <- c(
   "edu_t7", "edu_t6", "pov_t7", "pov_t6", "trct_pct_pov_t6", "vc_rate15",
   "asthma_env_risk"
 )
-
+ 
 df_be <- df_reduced %>%
   dplyr::select(all_of(be_covariates)) %>%
   na.omit() %>%
   as.data.frame() %>%
   mutate(
     gvh1600count_std    = as.numeric(scale(gvh1600count)),
-    gvh1600rate_std    = as.numeric(scale(gvh1600_rate)),
+    gvh1600rate_std     = as.numeric(scale(gvh1600_rate)),
     gvh1000count_std    = as.numeric(scale(gvh1000count)),
     gvh500count_std     = as.numeric(scale(gvh500count)),
     vc_rate15_std       = as.numeric(scale(vc_rate15)),
@@ -1625,201 +1396,118 @@ df_be <- df_reduced %>%
     pov_t6_std          = as.numeric(scale(pov_t6)),
     trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6))
   )
-
-cat("Built environment subsample n =", nrow(df_be), "\n")                              # n=512
-cat("Incident asthma cases n =", sum(df_be$newasthmadx_22, na.rm = TRUE), "\n")       # n=28
-# Note: small case count (n=31) limits power; interpret with caution
-# edu_t7 shows quasi-complete separation in this subsample — robust SEs used throughout
-
-# --- [24.2] Models ----
-out_be_list <- list(
-  
-  # M1: asthma-specific environmental risk index (peeling_paint, dirtiness, mice_rats, neighborhood_trash_yn)
-  # Result: OR=1.43 (95% CI: 1.04–1.97, p=.029) — exposure remains significant
-  m1_risk = glm(
-    newasthmadx_22 ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
-      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
-      household_smokers_t6 + household_size_t6 + asthma_env_risk,
-    data = df_be, family = binomial(link = "logit")),
-  
-  # M2: sex interaction + built environment indicators
-  # Result: interaction NS (p=.415); low power given n=31 cases
-  m2_sex = glm(
-    newasthmadx_22 ~ gvh1600rate_std * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
-      pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
-      household_smokers_t6 + household_size_t6 + asthma_env_risk,
-    data = df_be, family = binomial(link = "logit"))
-)
-
-# Results with robust SEs, CIs, and ORs
-lapply(out_be_list, function(m) {
-  list(
-    summary = summary(m),
-    n       = nobs(m),
-    robust  = coeftest(m, vcov. = vcovHC, type = "HC1"),
-    ci      = coefci(m,   vcov. = vcovHC, type = "HC1"),
-    OR      = exp(coef(m)["gvh1600rate_std"]),
-    OR_ci   = exp(coefci(m, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
-  )
-})
-
-# Summary:
-# M1 (adjust asthma-specific environmental risk index):  OR=1.60 (95% CI: 1.08–2.39), p=.025
-# M2 (sex interaction):  interaction NS (p=.217); unreliable given n=31 cases
-# Interpretation: association persists after built environment adjustment;
-# effect not explained by correlated environmental asthma triggers.
-
-exp(coef(out_be_list$m1)["asthma_env_risk"])
-exp(coefci(out_be_list$m1, vcov. = vcovHC, type = "HC1")["asthma_env_risk", ])
-
-
-# Sex-specific ORs from (linear combination: main + interaction)
-int_term <- grep("gvh1600rate_std:female|female:gvh1600rate_std",
-                 names(coef(out_be_list$m2)), value = TRUE)
-# Females
-robust_ci_lincomb(out_be_list$m2, setNames(c(1, 1), c("gvh1600rate_std", int_term)))
-# Males
-robust_ci_term(out_be_list$m2, "gvh1600rate_std")
-
-
+ 
+cat("Built environment subsample n =", nrow(df_be), "\n")
+cat("Incident asthma cases n =", sum(df_be$newasthmadx_22), "\n")
+ 
+m_be <- glm(
+  newasthmadx_22 ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+    pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
+    household_smokers_t6 + household_size_t6 + asthma_env_risk,
+  data = df_be, family = binomial(link = "logit"))
+ 
+coeftest(m_be, vcov. = vcovHC, type = "HC1")
+exp(coef(m_be)["gvh1600rate_std"])
+exp(coefci(m_be, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ])
+ 
+ 
 # =============================================================================
-# [25] SUPPLEMENTAL: ADDITIONAL SENSITIVITY CHECKS ----
-# Tests robustness to maternal prenatal smoking, youth BMI, PCG-reported asthma
-# Separate datasets per model; all yield n=1,938 (no additional case loss)
-# Key finding: OR range 1.22–1.23 — highly stable across all specifications
+# [25] SUPPLEMENTAL: ADDITIONAL CONFOUNDERS ----
+# Maternal prenatal smoking, youth BMI (age 22), and parent asthma diagnosis.
+# Separate complete-case datasets per added covariate. HC1 SEs.
 # =============================================================================
-
+ 
 # --- [25.1] Analytic datasets ----
-
-# Maternal prenatal smoking (n=1,938)
+sens_vars <- c("idnum", "age_t7", "female", "race", "smoking_t7", "smoking_t6", "vaping_t7",
+               "household_smokers_t6", "household_size_t6", "newasthmadx_22",
+               "gvh1600count", "gvh1600_rate", "edu_t7", "edu_t6", "pov_t7", "pov_t6",
+               "trct_pct_pov_t6", "vc_rate15")
+ 
 df_sens_momsmk <- df_reduced %>%
-  dplyr::select(idnum, age_t7, female, race, smoking_t7, smoking_t6, vaping_t7, 
-                household_smokers_t6, household_size_t6, newasthmadx_22,
-                gvh1600count, gvh1600_rate, edu_t7, edu_t6, pov_t7, pov_t6, trct_pct_pov_t6, vc_rate15, momsmk) %>%
+  dplyr::select(all_of(sens_vars), momsmk) %>%
   na.omit() %>%
   as.data.frame() %>%
-  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)), 
+  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)),
          vc_rate15_std = as.numeric(scale(vc_rate15)),
          pov_t7_std = as.numeric(scale(pov_t7)), pov_t6_std = as.numeric(scale(pov_t6)),
          trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6)))
-cat("momsmk sensitivity n =", nrow(df_sens_momsmk), "\n")  # n=1,938
-
-# Youth BMI at Y22 (n=1,938)
+ 
 df_sens_bmi <- df_reduced %>%
-  dplyr::select(idnum, age_t7, female, race, smoking_t7, smoking_t6, vaping_t7, 
-                household_smokers_t6, household_size_t6, newasthmadx_22,
-                gvh1600count, gvh1600_rate,edu_t7, edu_t6, pov_t7, pov_t6, trct_pct_pov_t6, vc_rate15, bmiz_t7) %>%
+  dplyr::select(all_of(sens_vars), bmiz_t7) %>%
   na.omit() %>%
   as.data.frame() %>%
-  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)), 
+  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)),
          vc_rate15_std = as.numeric(scale(vc_rate15)),
          pov_t7_std = as.numeric(scale(pov_t7)), pov_t6_std = as.numeric(scale(pov_t6)),
          trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6)))
-cat("BMI sensitivity n =", nrow(df_sens_bmi), "\n")  # n=1,938
-
-# PCG-reported asthma dx (n=1,938)
+ 
 df_sens_pcg <- df_reduced %>%
-  dplyr::select(idnum, age_t7, female, race, smoking_t7, smoking_t6, vaping_t7, 
-                household_smokers_t6, household_size_t6, newasthmadx_22,
-                gvh1600count, gvh1600_rate,edu_t7, edu_t6, pov_t7, pov_t6, trct_pct_pov_t6, vc_rate15, pcg_asthma) %>%
+  dplyr::select(all_of(sens_vars), pcg_asthma) %>%
   na.omit() %>%
   as.data.frame() %>%
-  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)), 
+  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)),
          vc_rate15_std = as.numeric(scale(vc_rate15)),
          pov_t7_std = as.numeric(scale(pov_t7)), pov_t6_std = as.numeric(scale(pov_t6)),
          trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6)))
-cat("PCG asthma sensitivity n =", nrow(df_sens_pcg), "\n")  # n=1,938
-
-# All three sensitivity covariates combined (n=1,938)
+ 
 df_sens_all <- df_reduced %>%
-  dplyr::select(idnum, age_t7, female, race, smoking_t7, smoking_t6, vaping_t7, 
-                household_smokers_t6, household_size_t6, newasthmadx_22,
-                gvh1600count, gvh1600_rate, edu_t7, edu_t6, pov_t7, pov_t6, trct_pct_pov_t6, vc_rate15,
-                momsmk, bmiz_t7, pcg_asthma) %>%
+  dplyr::select(all_of(sens_vars), momsmk, bmiz_t7, pcg_asthma) %>%
   na.omit() %>%
   as.data.frame() %>%
-  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)), 
+  mutate(gvh1600count_std = as.numeric(scale(gvh1600count)), gvh1600rate_std = as.numeric(scale(gvh1600_rate)),
          vc_rate15_std = as.numeric(scale(vc_rate15)),
          pov_t7_std = as.numeric(scale(pov_t7)), pov_t6_std = as.numeric(scale(pov_t6)),
          trct_pct_pov_t6_std = as.numeric(scale(trct_pct_pov_t6)))
-cat("All sensitivity covariates n =", nrow(df_sens_all), "\n")  # n=1,938
-
+ 
+sapply(list(momsmk = df_sens_momsmk, bmi = df_sens_bmi, pcg = df_sens_pcg, all = df_sens_all), nrow)
+ 
 # --- [25.2] Models ----
 out_sens_list <- list(
-  
-  # M1: + maternal prenatal smoking — OR=1.22 (1.03–1.45, p=.021); momsmk NS (p=.733)
   m1_momsmk = glm(
     newasthmadx_22 ~ gvh1600rate_std + momsmk + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
       pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
       household_smokers_t6 + household_size_t6,
     data = df_sens_momsmk, family = binomial(link = "logit")),
-  
-  # M2: + youth BMI at Y22 — OR=1.22 (1.03–1.45, p=.021); BMI NS (p=.372)
+ 
   m2_bmi = glm(
     newasthmadx_22 ~ gvh1600rate_std + bmiz_t7 + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
       pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
       household_smokers_t6 + household_size_t6,
     data = df_sens_bmi, family = binomial(link = "logit")),
-  
-  # M3: + PCG-reported asthma — OR=1.23 (1.03–1.46, p=.021); PCG asthma NS (p=.586)
+ 
   m3_pcg = glm(
     newasthmadx_22 ~ gvh1600rate_std + pcg_asthma + age_t7 + female + smoking_t6 + smoking_t7 +
       vaping_t7 + pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race + trct_pct_pov_t6_std + vc_rate15_std +
       household_smokers_t6 + household_size_t6,
     data = df_sens_pcg, family = binomial(link = "logit")),
-  
-  # M4: all three simultaneously [most conservative] — OR=1.23 (1.03–1.46, p=.020)
+ 
   m4_all = glm(
     newasthmadx_22 ~ gvh1600rate_std + momsmk + bmiz_t7 + pcg_asthma + age_t7 + female +
       smoking_t6 + smoking_t7 + vaping_t7 + pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race +
       trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
-    data = df_sens_all, family = binomial(link = "logit")),
-  
-  # M5: sex interaction + all — interaction p=.006; male OR=1.51 (1.22–1.87)
-  m5_sex = glm(
-    newasthmadx_22 ~ gvh1600rate_std * female + momsmk + bmiz_t7 + pcg_asthma + age_t7 +
-      smoking_t6 + smoking_t7 + vaping_t7 + pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + race +
-      trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
     data = df_sens_all, family = binomial(link = "logit"))
 )
-
-# Results with robust SEs, CIs, and ORs
-lapply(names(out_sens_list), function(nm) {
-  m <- out_sens_list[[nm]]
-  
-  # Identify which exposure term is present in this model
-  exp_var <- intersect(
-    c("gvh1600rate_std", "gvh1600rate_std"),
-    names(coef(m))
-  )[1]
-  
-  list(
-    model  = nm,
-    n      = nobs(m),
-    robust = coeftest(m, vcov. = vcovHC, type = "HC1"),
-    ci     = coefci(m,   vcov. = vcovHC, type = "HC1"),
-    OR     = exp(coef(m)[exp_var]),
-    OR_ci  = exp(coefci(m, vcov. = vcovHC, type = "HC1")[exp_var, ])
-  )
+ 
+lapply(out_sens_list, function(m) {
+  list(n     = nobs(m),
+       OR    = exp(coef(m)["gvh1600rate_std"]),
+       OR_ci = exp(coefci(m, vcov. = vcovHC, type = "HC1")["gvh1600rate_std", ]))
 })
-
-# Summary:
-# M1 (+ prenatal smoking): OR=1.26 (1.06–1.49), p=.009
-# M2 (+ BMI):              OR=1.26 (1.06–1.49), p=.009
-# M3 (+ PCG asthma):       OR=1.26 (1.06–1.50), p=.009
-# M4 (+ all three):        OR=1.26 (1.06–1.49), p=.009
-# M5 (sex interaction):    male OR=1.56 (1.25–1.95), interaction p=.007
-
-
+ 
+# Parent asthma OR
+exp(c(OR = coef(out_sens_list$m3_pcg)[["pcg_asthma"]],
+      coefci(out_sens_list$m3_pcg, vcov. = vcovHC, type = "HC1")["pcg_asthma", ]))
+ 
+ 
 # =============================================================================
-# [26] SUPPLEMENTAL: PROPENSITY SCORE MATCHED ANALYSIS ----
-# Full matching on Y15 neighborhood characteristics to balance exposed vs.
-# unexposed participants on pre-exposure socioeconomic factors.
-# Restricted to participants without asthma at Y15.
+# [26] SUPPLEMENTAL: PROPENSITY SCORE ANALYSES (Figures S3–S4) ----
+# Treatment: any deadly gun violence within 1,600m at age 15 (binary).
+# Restricted to participants without asthma at Y15. Outcome models use the
+# exposure rate standardized among treated (exposed) participants, weighted
+# by matching weights.
 # =============================================================================
-
+ 
 # --- [26.1] PSM analytic dataset ----
-# Pre-match: n=1,640 (exposed n=791, unexposed n=849; incident cases n=94)
 df_psm <- df_reduced %>%
   dplyr::select(
     idnum, gvh1600_any, gvh1600count, gvh1000_any, gvh1000count, gvh500_any, gvh500count, gvh1600_rate,
@@ -1834,7 +1522,7 @@ df_psm <- df_reduced %>%
   as.data.frame() %>%
   mutate(
     gvh1600count_std    = as.numeric(scale(gvh1600count)),
-    gvh1600rate_std    = as.numeric(scale(gvh1600_rate)),
+    gvh1600rate_std     = as.numeric(scale(gvh1600_rate)),
     pov_t6_std          = as.numeric(scale(pov_t6)),
     pov_t5_std          = as.numeric(scale(pov_t5)),
     pov_t7_std          = as.numeric(scale(pov_t7)),
@@ -1843,14 +1531,23 @@ df_psm <- df_reduced %>%
     vc_rate15_std       = as.numeric(scale(vc_rate15)),
     vc_rate9_std        = as.numeric(scale(vc_rate9))
   )
-
-cat("PSM analytic sample n =", nrow(df_psm), "\n")               # n=1,640
-cat("Exposed (any DGV) n =", sum(df_psm$gvh1600_any == 1), "\n") # n=791
-cat("Unexposed n =", sum(df_psm$gvh1600_any == 0), "\n")          # n=849
-cat("Incident asthma cases n =", sum(df_psm$newasthmadx_22, na.rm = TRUE), "\n")  # n=94
-
-# --- [26.2] Full matching on Y15 neighborhood characteristics ----
-# Exact matching on race; calipers on continuous variables to prevent poor matches
+ 
+cat("PSM pre-match n =", nrow(df_psm), "| exposed =", sum(df_psm$gvh1600_any == 1),
+    "| unexposed =", sum(df_psm$gvh1600_any == 0),
+    "| cases =", sum(df_psm$newasthmadx_22), "\n")
+ 
+# Weighted mean/SD among treated, used to standardize exposure
+standardize_att <- function(data, var_name, treated_idx, weights_var = "weights") {
+  var     <- data[[var_name]]
+  weights <- data[[weights_var]]
+  mean_treated <- Hmisc::wtd.mean(var[treated_idx], weights = weights[treated_idx])
+  sd_treated   <- sqrt(Hmisc::wtd.var(var[treated_idx], weights = weights[treated_idx]))
+  (var - mean_treated) / sd_treated
+}
+ 
+# --- [26.2] Full matching (ATT) ----
+# Exact matching on race/ethnicity; calipers of 0.5 SD on poverty variables and
+# 1.0 SD on county violent crime at age 9
 m_out_psm <- matchit(
   gvh1600_any ~ race + pov_t6_std + edu_t6 + trct_pct_pov_t6_std +
     trct_pct_pov_t5_std + pov_t5_std + vc_rate9_std,
@@ -1860,76 +1557,48 @@ m_out_psm <- matchit(
   link        = "logit",
   estimand    = "att",
   caliper     = c(pov_t6_std = .5, trct_pct_pov_t6_std = .5,
-                  trct_pct_pov_t5_std = .5, pov_t5_std = .5, 
+                  trct_pct_pov_t5_std = .5, pov_t5_std = .5,
                   vc_rate9_std = 1),
   std.caliper = TRUE,
   exact       = ~ race
 )
-
-# Balance diagnostics — all SMDs < 0.10 except edu_t63 (SMD=0.102, marginally above threshold)
-# Race perfectly balanced (SMD=0.000) due to exact matching
-# 411 participants unmatched due to caliper restrictions (209 control, 202 treated)
+ 
 summary(m_out_psm, un = FALSE)
-love.plot(m_out_psm, threshold = 0.10)
-plot(m.out.main, type = "jitter", interactive = FALSE)
-
+ 
+# Figure S3: propensity score distributions
+plot(m_out_psm, type = "jitter", interactive = FALSE)
+ 
+# Figure S4: covariate balance (SMDs)
+figS4_balance <- love.plot(m_out_psm, threshold = 0.10)
+print(figS4_balance)
+ggsave(file.path(out_dir, "figS4_love_plot.png"), figS4_balance,
+       width = 7, height = 5, dpi = 500)
+ 
 # --- [26.3] Matched dataset ----
-# Matched sample: n=1,229 (treated n=589, control ESS=182)
 matched_data_psm <- match.data(m_out_psm, subclass = "subclass")
-cat("Matched sample n =", nrow(matched_data_psm), "\n")  # n=1,229
-table(matched_data_psm$newasthmadx_22)                   # 0=1,162; 1=67
-
-# re-standardize exposure within treated group 
-library(Hmisc)
-standardize_att <- function(data, var_name, treated_idx, weights_var = "weights") {
-  # Get the variable and weights
-  var <- data[[var_name]]
-  weights <- data[[weights_var]]
-  
-  # Calculate weighted mean and SD for treated group
-  mean_treated <- wtd.mean(var[treated_idx], weights = weights[treated_idx])
-  sd_treated <- sqrt(wtd.var(var[treated_idx], weights = weights[treated_idx]))
-  
-  # Standardize the entire variable
-  standardized <- (var - mean_treated) / sd_treated
-  
-  return(standardized)
-}
-
-# Identify treated observations once
-treated_idx <- matched_data_psm$gvh1600_any == 1
-
-# Apply standardization to all variables
-vars_to_standardize <- c("gvh1600_rate")
-
-for (var in vars_to_standardize) {
-  new_var_name <- paste0(var, "_att_std")
-  matched_data_psm[[new_var_name]] <- standardize_att(
-    matched_data_psm, 
-    var, 
-    treated_idx
-  )
-}
+cat("Matched sample n =", nrow(matched_data_psm), "\n")
+table(matched_data_psm$newasthmadx_22)
+ 
+matched_data_psm$gvh1600_rate_att_std <- standardize_att(
+  matched_data_psm, "gvh1600_rate", matched_data_psm$gvh1600_any == 1
+)
 summary(matched_data_psm$gvh1600_rate_att_std)
-
+ 
 # --- [26.4] Weighted regression on matched sample ----
 # Cluster-robust SEs clustered on matched subclass
-# Result: OR=1.22 (95% CI: 1.00–1.48, p=.047) — consistent with primary model
 m_psm_weighted <- glm(
-  newasthmadx_22 ~ gvh1600_rate_att_std  + female + age_t7 + pov_t7_std +
+  newasthmadx_22 ~ gvh1600_rate_att_std + female + age_t7 + pov_t7_std +
     smoking_t6 + smoking_t7 + vaping_t7 +
     household_smokers_t6 + household_size_t6 + vc_rate15_std,
   family  = quasibinomial(link = "logit"),
   data    = matched_data_psm,
   weights = weights
 )
-nobs(m_psm_weighted)  # n=1,229
+nobs(m_psm_weighted)
 coeftest(m_psm_weighted, vcov. = vcovCL, cluster = ~subclass)
-coefci(m_psm_weighted,   vcov. = vcovCL, cluster = ~subclass, level = 0.95)
 exp(coef(m_psm_weighted)["gvh1600_rate_att_std"])
 exp(coefci(m_psm_weighted, vcov. = vcovCL, cluster = ~subclass)["gvh1600_rate_att_std", ])
-# OR=1.25 (95% CI: 0.99–1.59), p=.061
-
+ 
 m_psm_weighted_int <- glm(
   newasthmadx_22 ~ gvh1600_rate_att_std * female + age_t7 + pov_t7_std +
     smoking_t6 + smoking_t7 + vaping_t7 +
@@ -1938,106 +1607,131 @@ m_psm_weighted_int <- glm(
   data    = matched_data_psm,
   weights = weights
 )
-
-ct_int  <- coeftest(m_psm_weighted_int, vcov. = vcovCL, cluster = ~subclass)
-ci_int  <- coefci(m_psm_weighted_int,   vcov. = vcovCL, cluster = ~subclass, level = 0.95)
-
-# Interaction term OR = 0.75 (0.46 - 1.23), p=.256
-int_term <- grep("gvh1600_rate_att_std:female|female:gvh1600_rate_att_std",
-                 rownames(ct_int), value = TRUE)
-cat("Interaction term OR:\n")
+ct_int <- coeftest(m_psm_weighted_int, vcov. = vcovCL, cluster = ~subclass)
+ci_int <- coefci(m_psm_weighted_int,   vcov. = vcovCL, cluster = ~subclass)
+cat(sprintf("Interaction OR = %.2f (95%% CI: %.2f-%.2f), p = %.3f\n",
+            exp(ct_int["gvh1600_rate_att_std:female", "Estimate"]),
+            exp(ci_int["gvh1600_rate_att_std:female", 1]),
+            exp(ci_int["gvh1600_rate_att_std:female", 2]),
+            ct_int["gvh1600_rate_att_std:female", "Pr(>|z|)"]))
+ 
+# --- [26.5] Propensity score subclassification (10 strata) ----
+# Sensitivity check retaining all pre-match participants. HC0 SEs.
+m_out_sub <- matchit(
+  gvh1600_any ~ race + pov_t6_std + edu_t6 + trct_pct_pov_t6_std +
+    trct_pct_pov_t5_std + pov_t5_std + vc_rate9_std,
+  data     = df_psm,
+  method   = "subclass",
+  subclass = 10,
+  distance = "glm",
+  link     = "logit",
+  estimand = "ATT"
+)
+ 
+summary(m_out_sub, un = FALSE)                   # pooled balance
+summary(m_out_sub, subclass = TRUE, un = FALSE)  # within-subclass balance
+ 
+matched_data_sub <- match.data(m_out_sub, subclass = "subclass")
+cat("Subclassified sample n =", nrow(matched_data_sub), "\n")
+table(matched_data_sub$newasthmadx_22)
+table(matched_data_sub$subclass, matched_data_sub$gvh1600_any)   # controls per stratum
+ 
+matched_data_sub$gvh1600_rate_att_std <- standardize_att(
+  matched_data_sub, "gvh1600_rate", matched_data_sub$gvh1600_any == 1
+)
+ 
+m_sub_weighted <- glm(
+  newasthmadx_22 ~ gvh1600_rate_att_std + female + age_t7 + pov_t7_std +
+    smoking_t6 + smoking_t7 + vaping_t7 +
+    household_smokers_t6 + household_size_t6 + vc_rate15_std,
+  family  = quasibinomial(link = "logit"),
+  data    = matched_data_sub,
+  weights = weights
+)
+ct_sub <- coeftest(m_sub_weighted, vcov. = vcovHC, type = "HC0")
+ci_sub <- coefci(m_sub_weighted,   vcov. = vcovHC, type = "HC0")
 cat(sprintf("OR = %.2f (95%% CI: %.2f-%.2f), p = %.3f\n",
-            exp(ct_int[int_term, "Estimate"]),
-            exp(ci_int[int_term, 1]),
-            exp(ci_int[int_term, 2]),
-            ct_int[int_term, "Pr(>|z|)"]))
-
-# Summary: matched OR virtually identical to primary (OR=1.22 vs. 1.22),
-# confirming association is not explained by pre-exposure neighborhood confounding.
-
-# --- Sample size comparison: primary vs. matched, overall and by sex ---
-
-# Primary analytic sample (df_main_nomiss or equivalent — adjust name as needed)
-cat("=== PRIMARY SAMPLE ===\n")
-cat("Overall n =", nrow(df_main_nomiss), "\n")
-cat("Incident asthma cases n =", sum(df_main_nomiss$newasthmadx_22, na.rm = TRUE), "\n")
-table(Sex = df_main_nomiss$female)
-df_main_nomiss %>%
-  dplyr::group_by(female) %>%
-  dplyr::summarise(total = dplyr::n(), cases = sum(newasthmadx_22, na.rm = TRUE))
-
-# PSM pre-match sample
-cat("\n=== PSM PRE-MATCH SAMPLE ===\n")
-cat("Overall n =", nrow(df_psm), "\n")
-cat("Incident asthma cases n =", sum(df_psm$newasthmadx_22, na.rm = TRUE), "\n")
-df_psm %>%
-  dplyr::group_by(female) %>%
-  dplyr::summarise(total = dplyr::n(), cases = sum(newasthmadx_22, na.rm = TRUE))
-
-# PSM matched sample
-cat("\n=== PSM MATCHED SAMPLE ===\n")
-cat("Overall n =", nrow(matched_data_psm), "\n")
-cat("Incident asthma cases n =", sum(matched_data_psm$newasthmadx_22, na.rm = TRUE), "\n")
-matched_data_psm %>%
-  dplyr::group_by(female) %>%
-  dplyr::summarise(
-    total     = dplyr::n(),
-    cases     = sum(newasthmadx_22, na.rm = TRUE),
-    exposed   = sum(gvh1600_any == 1),
-    pct_cases = round(cases / total * 100, 1)
-  )
-
-# Effective sample size reduction
-cat("\n=== REDUCTION ===\n")
-cat("Primary -> matched, overall:", nrow(df_main_nomiss), "->", nrow(matched_data_psm), "\n")
-cat("% retained:", round(nrow(matched_data_psm) / nrow(df_main_nomiss) * 100, 1), "%\n")
-
-
-
+            exp(ct_sub["gvh1600_rate_att_std", "Estimate"]),
+            exp(ci_sub["gvh1600_rate_att_std", 1]),
+            exp(ci_sub["gvh1600_rate_att_std", 2]),
+            ct_sub["gvh1600_rate_att_std", "Pr(>|z|)"]))
+ 
+ 
 # =============================================================================
-# [27] DESCRIPTIVE STATISTICS TABLE ----
+# [27] DESCRIPTIVE STATISTICS (Table 1) ----
+# Raw (unstandardized) values; overall and by sex. Hospitalization and
+# functional limitation are among incident cases.
 # =============================================================================
-
+ 
 mean_sd <- function(x) sprintf("%.1f (%.2f)", mean(x, na.rm = TRUE), sd(x, na.rm = TRUE))
-n_pct   <- function(x) {
+ 
+n_pct <- function(x) {
   n <- sum(x == 1, na.rm = TRUE); d <- sum(!is.na(x))
-  sprintf("%d (%.1f%%)", n, 100 * n / d)
+  sprintf("%d (%.1f)", n, 100 * n / d)
 }
-
-# Join hospitalization and severity outcomes from their respective subsamples
-# hosp_asthma_yn: df_newdx_hosp (incident Dx; n=103)
-# limit_asthma:   df_newdx_sev  (incident Dx; n=106)
+ 
+n_pct_level <- function(x, level) {
+  n <- sum(x == level, na.rm = TRUE); d <- sum(!is.na(x))
+  sprintf("%d (%.1f)", n, 100 * n / d)
+}
+ 
 df_desc <- df_main_nomiss %>%
-  dplyr::select(idnum, female, newasthmadx_22, gvh1600_any, gvh1600_rate,
-                pov_t6, trct_pct_pov_t6) %>%
   left_join(dplyr::select(df_newdx_hosp, idnum, hosp_asthma_yn), by = "idnum") %>%
   left_join(dplyr::select(df_newdx_sev,  idnum, limit_asthma),   by = "idnum")
-
-desc_summary <- function(data, group_label) {
-  data %>% summarise(
-    Group                    = group_label,
-    `Incident Asthma N (%)`  = n_pct(newasthmadx_22),
-    `Hospitalization N (%)`  = n_pct(hosp_asthma_yn),
-    `Severity M (SD)`        = mean_sd(limit_asthma),
-    `Any GV Exposure N (%)`  = n_pct(gvh1600_any),
-    `GV Rate M (SD)`        = mean_sd(gvh1600_rate),
-    `Poverty Ratio M (SD)`   = mean_sd(pov_t6),
-    `Tract Poverty % M (SD)` = mean_sd(trct_pct_pov_t6)
+ 
+desc_column <- function(d) {
+  c(
+    "Incident Asthma (age 15 to 22), N (%)"              = n_pct(d$newasthmadx_22),
+    "Hospitalization, Past 12 Months (age 22), N (%)"    = n_pct(d$hosp_asthma_yn),
+    "Functional Limitation (age 22), M (SD)"             = mean_sd(d$limit_asthma),
+    "Any Gun Violence Exposure (age 15), N (%)"          = n_pct(d$gvh1600_any),
+    "Gun Violence Exposure Rate (age 15), M (SD)"        = mean_sd(d$gvh1600_rate),
+    "Age at Exposure Assessment (age 15), M (SD)"        = mean_sd(d$age_t6),
+    "Age at Follow-Up Assessment (age 22), M (SD)"       = mean_sd(d$age_t7),
+    "Smoking, Past Month (age 15), N (%)"                = n_pct(d$smoking_t6),
+    "Smoking, Past Month (age 22), N (%)"                = n_pct(d$smoking_t7),
+    "Vaping, Past Year (age 22), N (%)"                  = n_pct(d$vaping_t7),
+    "Income-Poverty Ratio (age 15), M (SD)"              = mean_sd(d$pov_t6),
+    "Income-Poverty Ratio (age 22), M (SD)"              = mean_sd(d$pov_t7),
+    "Parental Education (age 15), N (%)"                 = "",
+    "  Less than HS"                                     = n_pct_level(d$edu_t6, 1),
+    "  HS or Equivalent"                                 = n_pct_level(d$edu_t6, 2),
+    "  Some College"                                     = n_pct_level(d$edu_t6, 3),
+    "  College/Graduate Degree"                          = n_pct_level(d$edu_t6, 4),
+    "Own Education (age 22), N (%)"                      = "",
+    "  Less than HS "                                    = n_pct_level(d$edu_t7, 1),
+    "  HS or Equivalent "                                = n_pct_level(d$edu_t7, 2),
+    "  Some College "                                    = n_pct_level(d$edu_t7, 3),
+    "  College/Graduate Degree "                         = n_pct_level(d$edu_t7, 4),
+    "Self-Reported Race/Ethnicity, N (%)"                = "",
+    "  Non-Hispanic Black/African American"              = n_pct_level(d$race, "Black"),
+    "  Non-Hispanic White"                               = n_pct_level(d$race, "White"),
+    "  Hispanic"                                         = n_pct_level(d$race, "Hispanic"),
+    "  Multiracial or Some Other Race"                   = n_pct_level(d$race, "Other"),
+    "Census Tract Poverty % (age 15), M (SD)"            = mean_sd(d$trct_pct_pov_t6),
+    "County Violent Crime Rate (age 15), M (SD)"         = mean_sd(d$vc_rate15),
+    "Household Smokers (age 15), N (%)"                  = n_pct(d$household_smokers_t6),
+    "Household Size (age 15), M (SD)"                    = mean_sd(d$household_size_t6),
+    "Parental Asthma Diagnosis, N (%)"                   = n_pct(d$pcg_asthma)
   )
 }
-
-table1 <- bind_rows(
-  desc_summary(df_desc, "Overall"),
-  desc_summary(df_desc %>% filter(female == 0), "Male"),
-  desc_summary(df_desc %>% filter(female == 1), "Female")
+ 
+table1 <- tibble(
+  Measure = names(desc_column(df_desc)),
+  Overall = desc_column(df_desc),
+  Male    = desc_column(df_desc %>% filter(female == 0)),
+  Female  = desc_column(df_desc %>% filter(female == 1))
 )
-print(table1)
-
-table(df_main_nomiss$female)
+print(table1, n = Inf)
+ 
+# Sample sizes by sex
+table(df_desc$female)
+ 
+ 
 # =============================================================================
 # [28] FIGURES ----
 # =============================================================================
-
+ 
 # Shared theme
 theme_poster <- theme_classic(base_size = 14) +
   theme(
@@ -2047,129 +1741,260 @@ theme_poster <- theme_classic(base_size = 14) +
     legend.background = element_rect(fill = NA, colour = NA)
   )
 TICK_TEXT <- 12
-
-# --- Figure 1: Forest plot — overall and sex-specific ORs (incident asthma) ---
-gvh_term <- "gvh1600rate_std"
-int_term  <- grep("gvh1600rate_std:female|female:gvh1600rate_std",
-                  names(coef(out_main_list$m6_sex)), value = TRUE)
-
+gvh_term  <- "gvh1600rate_std"
+ 
+# --- Figure 1: overall (M5) and sex-specific (M6) ORs, incident asthma ----
+n_all <- nrow(df_main_nomiss)
+n_m   <- sum(df_main_nomiss$female == 0)
+n_f   <- sum(df_main_nomiss$female == 1)
+lab_overall <- sprintf("Overall (N = %s)", format(n_all, big.mark = ","))
+lab_male    <- sprintf("Male (n = %s)",    format(n_m,   big.mark = ","))
+lab_female  <- sprintf("Female (n = %s)",  format(n_f,   big.mark = ","))
+ 
 plot_tbl_f1 <- bind_rows(
-  robust_ci_term(out_main_list$m5,     gvh_term) %>% mutate(group = "Overall"),
-  robust_ci_term(out_main_list$m6_sex, gvh_term) %>% mutate(group = "Male"),
+  robust_ci_term(out_main_list$m5,     gvh_term) %>% mutate(group = lab_overall),
+  robust_ci_term(out_main_list$m6_sex, gvh_term) %>% mutate(group = lab_male),
   robust_ci_lincomb(out_main_list$m6_sex,
-                    setNames(c(1, 1), c(gvh_term, int_term))) %>% mutate(group = "Female")
+                    setNames(c(1, 1), c(gvh_term, int_term))) %>% mutate(group = lab_female)
 ) %>%
-  mutate(
-    # Step 1: relabel to display strings
-    group = dplyr::recode(group,
-                          "Overall" = "Overall (N = 1,936)",
-                          "Male"    = "Male (n = 872)",
-                          "Female"  = "Female (n = 1,064)"
-    ),
-    # Step 2: order for plot (bottom to top on y-axis)
-    group = factor(group, levels = c(
-      "Overall (N = 1,936)",
-      "Male (n = 872)",
-      "Female (n = 1,064)"
-    )),
-    label = sprintf("%.2f (%.2f\u2013%.2f)", estimate, l95, u95)
-  )
-
+  mutate(group = factor(group, levels = c(lab_female, lab_male, lab_overall)))
+ 
 fig1_forest <- ggplot(plot_tbl_f1, aes(x = estimate, y = group)) +
   geom_errorbar(aes(xmin = l95, xmax = u95), width = 0, linewidth = 1, alpha = 0.9,
                 orientation = "y") +
   geom_point(size = 4) +
   geom_vline(xintercept = 1, linetype = "dashed", colour = "grey40", linewidth = 1.2) +
-  geom_text(aes(label = label), hjust = -0.10, vjust = 1.5, size = 5.5) +
   scale_x_continuous(trans = "log10", limits = c(0.8, 2),
-                     breaks = c(0.8, 1, 2), labels = c("0.8", "1.0", "2.0"),
-                     position = "bottom") +
-  labs(title = "Odds of incident Asthma by Age 22",
-       x = "Odds Ratio (per 1 SD exposure)", y = NULL) +
+                     breaks = c(0.8, 1, 2), labels = c("0.8", "1.0", "2.0")) +
+  labs(x = "Odds Ratio (per 1 SD exposure) for Incident Asthma Diagnosis", y = NULL) +
   theme_poster +
-  theme(axis.text.y  = element_text(size = TICK_TEXT, face = "bold", colour = "black"),
-        axis.title.y = element_blank())
-
-# --- Figure 2: Predicted probabilities by sex ---
-# Uses unstandardized count (gvh1600count) for interpretable x-axis
+  theme(axis.text.y = element_text(size = TICK_TEXT, face = "bold", colour = "black"))
+ 
+# --- Figure 2: predicted probability of incident asthma by sex ----
+# Annualized exposure rate (incidents per year) for an interpretable x-axis
 new_dx_1600_int <- glm(
-  newasthmadx_22 ~ gvh1600_rate * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 + 
+  newasthmadx_22 ~ gvh1600_rate * female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
     pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + trct_pct_pov_t6_std + vc_rate15_std +
     race + household_smokers_t6 + household_size_t6,
   data = df_main_nomiss, family = binomial(link = "logit"))
-
+ 
 pred <- ggpredict(new_dx_1600_int, terms = c("gvh1600_rate [all]", "female")) %>%
   as_tibble() %>%
   mutate(sex = ifelse(group == "0", "Male", "Female"))
-
+ 
 fig2_pred <- ggplot(pred, aes(x = x, y = predicted, colour = sex, fill = sex)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.15, linewidth = 0) +
   geom_line(linewidth = 1.4) +
+  geom_rug(data = df_main_nomiss, aes(x = gvh1600_rate), inherit.aes = FALSE,
+           sides = "b", alpha = 0.15, length = unit(0.025, "npc")) +
   scale_colour_manual(values = c(Male = "#0072B2", Female = "#D55E00")) +
   scale_fill_manual(values   = c(Male = "#0072B2", Female = "#D55E00")) +
   scale_x_continuous(expand = expansion(mult = c(0, 0))) +
   scale_y_continuous(labels = percent_format(accuracy = 1)) +
-  labs(title = "Predicted Probability of Incident Asthma by Age 22",
-       x = "Annual Exposure Rate (Age 15)", y = NULL, colour = NULL, fill = NULL) +
+  labs(x = "Annual Exposure Rate at Age 15 (Incidents per Year within 1,600m of Home)",
+       y = "Predicted Probability of Incident Asthma",
+       colour = NULL, fill = NULL) +
   theme_poster +
-  theme(legend.position      = c(0.01, 0.99),
-        legend.justification = c(0, 1))
-
-# --- Figure 3: Hospitalization ORs (incident and any Dx) ---
+  theme(legend.position = c(0.01, 0.99), legend.justification = c(0, 1))
+ 
+# --- Figure 3a: hospitalization ORs (Firth, profile-likelihood CIs) ----
+m_inc <- out_hosp_firth_list$m5
+m_any <- out_hosp_firth_anydx_list$m5
+lab_hosp_inc <- sprintf("Incident Dx\n(n=%d)   ", nrow(df_newdx_hosp))
+lab_hosp_any <- sprintf("Any Dx\n(n=%d)",         nrow(df_anydx_hosp))
+ 
 plot_tbl_hosp <- bind_rows(
-  robust_ci_term(out_hosp_new_list$m5, gvh_term) %>% mutate(group = "Incident Dx\n(n=103)   "),
-  robust_ci_term(out_hosp_any_list$m5, gvh_term) %>% mutate(group = "Any Dx\n(n=527)")
+  tibble(estimate = exp(m_inc$coefficients[gvh_term]),
+         l95      = exp(m_inc$ci.lower[gvh_term]),
+         u95      = exp(m_inc$ci.upper[gvh_term]),
+         group    = lab_hosp_inc),
+  tibble(estimate = exp(m_any$coefficients[gvh_term]),
+         l95      = exp(m_any$ci.lower[gvh_term]),
+         u95      = exp(m_any$ci.upper[gvh_term]),
+         group    = lab_hosp_any)
 ) %>%
-  mutate(group = factor(group, levels = c("Any Dx\n(n=527)", "Incident Dx\n(n=103)   ")),
-         label = sprintf("%.2f (%.2f\u2013%.2f)", estimate, l95, u95))
-
+  mutate(group = factor(group, levels = c(lab_hosp_any, lab_hosp_inc)))
+ 
 fig3_hosp <- ggplot(plot_tbl_hosp, aes(x = estimate, y = group)) +
   geom_errorbar(aes(xmin = l95, xmax = u95), width = 0, linewidth = 1, alpha = 0.9,
                 orientation = "y") +
   geom_point(size = 4) +
   geom_vline(xintercept = 1, linetype = "dashed", colour = "grey40", linewidth = 1.2) +
-  geom_text(aes(label = label), hjust = -0.10, vjust = 1.5, size = 5.5) +
   scale_x_continuous(trans = "log10", limits = c(0.8, 30),
-                     breaks = c(1, 2, 5, 25), labels = c("1", "2", "5", "25"),
-                     position = "bottom") +
-  labs(title = "Odds of Asthma Hospitalization by Age 22",
-       x = "Odds Ratio (per 1 SD exposure)", y = NULL) +
+                     breaks = c(1, 2, 5, 25), labels = c("1", "2", "5", "25")) +
+  labs(x = "Odds Ratio (per 1 SD Exposure) for Asthma Hospitalization", y = NULL) +
   theme_poster +
   theme(axis.text.y = element_text(face = "bold"))
-
-# --- Figure 4: Severity betas (incident and any Dx) ---
-# Models already fitted in Sections 20–21 — no refitting needed
+ 
+# --- Figure 3b: functional limitation betas (HC1) ----
+lab_sev_inc <- sprintf("Incident Dx\n(n=%d)   ", nrow(df_newdx_sev))
+lab_sev_any <- sprintf("Any Dx\n(n=%d)",         nrow(df_anydx_sev))
+ 
 plot_tbl_sev <- bind_rows(
   robust_ci_term(out_sev_new_list$m5, gvh_term, transform = identity) %>%
-    mutate(group = "Incident Dx\n(n=106)   "),
+    mutate(group = lab_sev_inc),
   robust_ci_term(out_sev_any_list$m5, gvh_term, transform = identity) %>%
-    mutate(group = "Any Dx\n(n=533)")
+    mutate(group = lab_sev_any)
 ) %>%
-  mutate(group = factor(group, levels = c("Any Dx\n(n=533)", "Incident Dx\n(n=106)   ")),
-         label = sprintf("%.2f (%.2f\u2013%.2f)", estimate, l95, u95))
-
-fig4_sev <- ggplot(plot_tbl_sev, aes(x = estimate, y = group)) +
+  mutate(group = factor(group, levels = c(lab_sev_any, lab_sev_inc)))
+ 
+fig3_sev <- ggplot(plot_tbl_sev, aes(x = estimate, y = group)) +
   geom_errorbar(aes(xmin = l95, xmax = u95), width = 0, linewidth = 1, alpha = 0.9,
                 orientation = "y") +
   geom_point(size = 4) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey40", linewidth = 1.2) +
-  geom_text(aes(label = label), hjust = -0.10, vjust = 1.5, size = 5.5) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 5), position = "bottom") +
-  labs(title = "Associations with Asthma Severity at Age 22",
-       x = "\u03b2 (per 1 SD exposure)", y = NULL) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 5)) +
+  labs(x = "β (per 1 SD Exposure) for Functional Limitation", y = NULL) +
   theme_poster +
   theme(axis.text.y = element_text(face = "bold"))
-
+ 
+# --- Figure 3: combined panels ----
+fig3_combined <- (fig3_hosp / fig3_sev) +
+  plot_annotation(tag_levels = "a") &
+  theme(plot.tag = element_text(face = "bold", size = 16))
+ 
 # --- Print and save ---
 print(fig1_forest)
 print(fig2_pred)
-print(fig3_hosp)
-print(fig4_sev)
-
-ggsave("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/2. MANUSCRIPTS/MARTZ GUN VIOLENCE ASTHMA/plots/fig1_forest_overall_sex.png", fig1_forest, width = 7.5, height = 6, dpi = 500)
-ggsave("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/2. MANUSCRIPTS/MARTZ GUN VIOLENCE ASTHMA/plots/fig2_pred_prob_sex.png",      fig2_pred,   width = 7.5, height = 6, dpi = 500)
-ggsave("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/2. MANUSCRIPTS/MARTZ GUN VIOLENCE ASTHMA/plots/fig3_hosp_OR.png",            fig3_hosp,   width = 7.5, height = 6, dpi = 500)
-ggsave("/Users/co453621/Library/CloudStorage/OneDrive-UniversityofCentralFlorida/2. MANUSCRIPTS/MARTZ GUN VIOLENCE ASTHMA/plots/fig4_severity_B.png",         fig4_sev,    width = 7.5, height = 6, dpi = 500)
-
-
+print(fig3_combined)
+ 
+ggsave(file.path(out_dir, "fig1_forest_overall_sex.png"),  fig1_forest,   width = 7,   height = 5, dpi = 500)
+ggsave(file.path(out_dir, "fig2_pred_prob_sex.png"),       fig2_pred,     width = 7.5, height = 6, dpi = 500)
+ggsave(file.path(out_dir, "fig3_secondary_combined.png"),  fig3_combined, width = 7,   height = 7, dpi = 500)
+ 
+ 
 # =============================================================================
+# [29] SUPPLEMENTAL: EXPOSURE DATA QUALITY ----
+# HC0 robust SEs.
+# =============================================================================
+ 
+# --- [29.1] Convergent validity: GVA exposure vs. county violent crime (UCR) ----
+cor.test(df_main_nomiss$gvh1600_rate, df_main_nomiss$vc_rate15, method = "spearman")
+ 
+# --- [29.2] Excluding California (FIPS 6) and Michigan (FIPS 26) residents ----
+df_sens_state <- df_main_nomiss %>% filter(!state_t6 %in% c(6, 26))
+nrow(df_sens_state); sum(df_sens_state$newasthmadx_22)
+ 
+m_sens_state <- glm(
+  newasthmadx_22 ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+    edu_t6 + edu_t7 + pov_t6_std + pov_t7_std + race +
+    trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+  family = binomial(link = "logit"), data = df_sens_state)
+ct_state <- coeftest(m_sens_state, vcov. = vcovHC, type = "HC0")
+ci_state <- coefci(m_sens_state,   vcov. = vcovHC, type = "HC0")
+exp(c(OR = ct_state["gvh1600rate_std", "Estimate"], ci_state["gvh1600rate_std", ]))
+ct_state["gvh1600rate_std", "Pr(>|z|)"]
+ 
+# --- [29.3] Restricted to participants with >= 12 months of GVA data ----
+# (exposure counts not annualized)
+df_sens_full <- df_main_nomiss %>% filter(atleast_1year_exposure == 1)
+nrow(df_sens_full); sum(df_sens_full$newasthmadx_22)
+ 
+m_sens_full <- glm(
+  newasthmadx_22 ~ gvh1600rate_std + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+    edu_t6 + edu_t7 + pov_t6_std + pov_t7_std + race +
+    trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+  family = binomial(link = "logit"), data = df_sens_full)
+ct_full <- coeftest(m_sens_full, vcov. = vcovHC, type = "HC0")
+ci_full <- coefci(m_sens_full,   vcov. = vcovHC, type = "HC0")
+exp(c(OR = ct_full["gvh1600rate_std", "Estimate"], ci_full["gvh1600rate_std", ]))
+ct_full["gvh1600rate_std", "Pr(>|z|)"]
+ 
+ 
+# =============================================================================
+# [30] SUPPLEMENTAL: EXPOSURE DISTRIBUTION ----
+# HC0 robust SEs, except female-specific ORs (female_or, HC1).
+# =============================================================================
+ 
+# --- [30.1] Categorical exposure: none, low (<= median among exposed), high ----
+mean(df_main_nomiss$gvh1600_rate == 0)
+med_exp <- median(df_main_nomiss$gvh1600_rate[df_main_nomiss$gvh1600_rate > 0])
+med_exp
+ 
+df_main_nomiss <- df_main_nomiss %>%
+  mutate(gv_cat = case_when(gvh1600_rate == 0       ~ "None",
+                            gvh1600_rate <= med_exp ~ "Low",
+                            TRUE                    ~ "High"),
+         gv_cat = factor(gv_cat, levels = c("None", "Low", "High")),
+         gv_cat_trend = as.numeric(gv_cat) - 1)
+ 
+table(df_main_nomiss$gv_cat, df_main_nomiss$newasthmadx_22)
+range(df_main_nomiss$gvh1600_rate[df_main_nomiss$gv_cat == "Low"])
+range(df_main_nomiss$gvh1600_rate[df_main_nomiss$gv_cat == "High"])
+ 
+m_cat <- glm(
+  newasthmadx_22 ~ gv_cat + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+    edu_t6 + edu_t7 + pov_t6_std + pov_t7_std + race +
+    trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+  family = binomial(link = "logit"), data = df_main_nomiss)
+ct_cat <- coeftest(m_cat, vcov. = vcovHC, type = "HC0")
+ci_cat <- coefci(m_cat,   vcov. = vcovHC, type = "HC0")
+round(exp(cbind(OR = coef(m_cat), ci_cat))[c("gv_catLow", "gv_catHigh"), ], 2)
+ct_cat[c("gv_catLow", "gv_catHigh"), ]
+ 
+# Linear trend across categories
+m_trend <- update(m_cat, . ~ . - gv_cat + gv_cat_trend)
+coeftest(m_trend, vcov. = vcovHC, type = "HC0")["gv_cat_trend", ]
+ 
+# --- [30.2] Log-transformed exposure, log(rate + 1) ----
+m_log_main <- glm(
+  newasthmadx_22 ~ log1p(gvh1600_rate) + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+    pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + trct_pct_pov_t6_std + vc_rate15_std +
+    race + household_smokers_t6 + household_size_t6,
+  data = df_main_nomiss, family = binomial)
+ci_log <- coefci(m_log_main, vcov. = vcovHC, type = "HC0")["log1p(gvh1600_rate)", ]
+exp(c(OR = coef(m_log_main)[["log1p(gvh1600_rate)"]], ci_log))
+ 
+m_log_sex <- update(new_dx_1600_int, . ~ . - gvh1600_rate * female + log1p(gvh1600_rate) * female)
+coeftest(m_log_sex, vcov. = vcovHC, type = "HC0")[c("log1p(gvh1600_rate)", "log1p(gvh1600_rate):female"), ]
+ 
+# --- [30.3] Excluding participants above the 99th and 95th exposure percentiles ----
+# OR per additional incident per year
+for (p in c(0.99, 0.95)) {
+  cut  <- quantile(df_main_nomiss$gvh1600_rate, p)
+  dsub <- subset(df_main_nomiss, gvh1600_rate <= cut)
+ 
+  m_main <- glm(newasthmadx_22 ~ gvh1600_rate + female + age_t7 + smoking_t6 + smoking_t7 + vaping_t7 +
+                  pov_t7_std + edu_t7 + edu_t6 + pov_t6_std + trct_pct_pov_t6_std + vc_rate15_std +
+                  race + household_smokers_t6 + household_size_t6,
+                data = dsub, family = binomial)
+  m_int  <- update(new_dx_1600_int, data = dsub)
+ 
+  ci_main <- coefci(m_main, vcov. = vcovHC, type = "HC0")["gvh1600_rate", ]
+  ci_male <- coefci(m_int,  vcov. = vcovHC, type = "HC0")["gvh1600_rate", ]
+  ct_int  <- coeftest(m_int, vcov. = vcovHC, type = "HC0")
+ 
+  cat(sprintf("\n<= %.0fth percentile (rate <= %.1f): n = %d, cases = %d\n",
+              p * 100, cut, nobs(m_main), sum(dsub$newasthmadx_22)))
+  cat(sprintf("  Overall OR = %.2f (%.2f-%.2f)\n",
+              exp(coef(m_main)["gvh1600_rate"]), exp(ci_main[1]), exp(ci_main[2])))
+  cat(sprintf("  Males OR   = %.2f (%.2f-%.2f)\n",
+              exp(coef(m_int)["gvh1600_rate"]), exp(ci_male[1]), exp(ci_male[2])))
+  cat("  Females OR:\n"); print(female_or(m_int, "gvh1600_rate"))
+  cat(sprintf("  Interaction p = %.3f\n", ct_int["gvh1600_rate:female", 4]))
+}
+ 
+ 
+# =============================================================================
+# [31] SUPPLEMENTAL: NEIGHBORHOOD TRAFFIC DENSITY ----
+# Youth-reported traffic density at age 15 (proxy for traffic-related air
+# pollution). HC0 robust SEs.
+# =============================================================================
+ 
+table(df_main_nomiss$traffic_t6, useNA = "ifany")
+ 
+df_traffic <- df_main_nomiss %>% filter(!is.na(traffic_t6))
+nrow(df_traffic); sum(df_traffic$newasthmadx_22)
+ 
+m_traffic <- glm(
+  newasthmadx_22 ~ gvh1600rate_std + traffic_t6 + age_t7 + female + smoking_t6 + smoking_t7 + vaping_t7 +
+    edu_t6 + edu_t7 + pov_t6_std + pov_t7_std + race +
+    trct_pct_pov_t6_std + vc_rate15_std + household_smokers_t6 + household_size_t6,
+  family = binomial(link = "logit"), data = df_traffic)
+ct_tr <- coeftest(m_traffic, vcov. = vcovHC, type = "HC0")
+ci_tr <- coefci(m_traffic,   vcov. = vcovHC, type = "HC0")
+exp(c(OR = ct_tr["gvh1600rate_std", "Estimate"], ci_tr["gvh1600rate_std", ]))
+ 
+# Exposure x traffic interaction
+m_traffic_int <- update(m_traffic, . ~ . + gvh1600rate_std:traffic_t6)
+coeftest(m_traffic_int, vcov. = vcovHC, type = "HC0")["gvh1600rate_std:traffic_t6", ]
